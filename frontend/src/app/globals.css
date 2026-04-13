@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-outfit);
+  --font-mono: var(--font-mono);
+  
+  --color-brand: #6366f1; /* Indigo matching SaaS vibes */
+  --color-brand-light: #818cf8;
+}
+
+:root {
+  --background: #030014;
+  --foreground: #e4e4e7;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Base resets */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
