@@ -353,6 +353,21 @@ def create_checkout_session(current_user: models.User = Depends(get_current_user
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/verify-session/{session_id}")
+def verify_session(session_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status == 'paid' and session.client_reference_id == str(current_user.id):
+            # Force update in case webhook hasn't fired yet
+            current_user.subscription_tier = "premium"
+            current_user.stripe_customer_id = session.customer
+            db.commit()
+            return {"status": "premium"}
+        return {"status": current_user.subscription_tier or "free"}
+    except Exception as e:
+        print(f"Session Verification Error: {e}")
+        return {"status": current_user.subscription_tier or "free"}
+
 from fastapi import Request
 
 @app.post("/webhook/stripe")
@@ -384,3 +399,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 db.commit()
 
     return {"status": "success"}
+@app.post("/downgrade")
+def downgrade_plan(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Note: In a live subscription environment, this would call stripe.Subscription.modify
+    # to cancel at period end. For now, we perform an immediate tier reset.
+    current_user.subscription_tier = 'free'
+    db.commit()
+    return {'message': 'Plan downgraded to free. No refund processed as per policy.'}

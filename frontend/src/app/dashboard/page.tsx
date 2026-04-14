@@ -1,8 +1,8 @@
 // src/app/dashboard/page.tsx
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,8 +30,20 @@ import {
   Shield,
   Sparkles
 } from 'lucide-react';
-
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+       <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-zinc-500 font-medium">
+        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin mb-4" />
+        <p className="tracking-widest uppercase text-xs">Loading Dashboard</p>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const [portfolio, setPortfolio] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [subdomain, setSubdomain] = useState('');
@@ -62,14 +74,38 @@ export default function DashboardPage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
 
+  // New: Payment status notification
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
-    fetchPortfolio();
-  }, [router]);
+    
+    const initializeDashboard = async () => {
+      if (sessionId) {
+        setIsVerifyingPayment(true);
+        try {
+          // Explicitly verify session with backend
+          await api.get(`/verify-session/${sessionId}`);
+          // Clear the session_id from URL without refreshing
+          window.history.replaceState({}, '', '/dashboard');
+        } catch (e) {
+          console.error("Verification failed", e);
+        } finally {
+          setIsVerifyingPayment(false);
+        }
+      }
+      fetchPortfolio();
+    };
+
+    initializeDashboard();
+  }, [router, sessionId]);
 
   const fetchPortfolio = async () => {
     try {
@@ -176,6 +212,20 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  const handleDowngrade = async () => {
+    const confirm = window.confirm("Are you sure you want to downgrade? Your premium features will be removed immediately. No refunds are provided for the remaining period.");
+    if (!confirm) return;
+
+    try {
+      await api.post('/downgrade');
+      await fetchPortfolio();
+      alert("Plan successfully downgraded to Free.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to downgrade plan.");
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -191,6 +241,11 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black font-sans">
+      {isVerifyingPayment && (
+        <div className="fixed top-0 inset-x-0 z-[200] bg-blue-600 text-white py-3 text-center text-xs font-bold uppercase tracking-[0.2em] animate-pulse">
+           Synchronizing Premium Clearance... Please wait.
+        </div>
+      )}
       {!portfolio ? (
         // --- SETUP MODE ---
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -395,23 +450,32 @@ export default function DashboardPage() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-8">
                   {/* KPI Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                      { label: "Global Impressions", value: "48,291", growth: "+12.4%" },
-                      { label: "Avg. Watch Time", value: "02:44", growth: "+4.1%" },
-                      { label: "Profile Conversion", value: "18.2%", growth: "-1.2%", negative: true }
-                    ].map((kpi, i) => (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
-                        key={kpi.label} 
-                        className="bg-[#050505] border border-zinc-900 p-8 rounded-xl flex flex-col justify-between"
-                      >
-                        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-6">{kpi.label}</p>
-                        <div className="flex items-end justify-between">
-                          <h3 className="text-4xl font-black text-white tracking-tighter">{kpi.value}</h3>
-                          <span className={`text-[10px] font-mono tracking-widest ${kpi.negative ? 'text-red-500' : 'text-green-500'}`}>{kpi.growth}</span>
-                        </div>
-                      </motion.div>
-                    ))}
+                    {(() => {
+                      const totalViews = portfolio.projects?.reduce((acc: number, p: any) => acc + (p.view_count || 0), 0) || 0;
+                      const avgViews = portfolio.projects?.length > 0 ? Math.round(totalViews / portfolio.projects.length) : 0;
+                      const verifiedCount = portfolio.projects?.filter((p: any) => p.is_verified).length || 0;
+                      const verificationRate = portfolio.projects?.length > 0 
+                        ? Math.round((verifiedCount / portfolio.projects.length) * 100) 
+                        : 0;
+
+                      return [
+                        { label: "Total Impressions", value: totalViews.toLocaleString(), growth: "+0.0%", detail: "All-time views" },
+                        { label: "Avg. Engagement", value: avgViews.toLocaleString(), growth: "+0.0%", detail: "Per asset" },
+                        { label: "Verification Score", value: `${verificationRate}%`, growth: "Strict", detail: "Proof of work" }
+                      ].map((kpi, i) => (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+                          key={kpi.label} 
+                          className="bg-[#050505] border border-zinc-900 p-8 rounded-xl flex flex-col justify-between"
+                        >
+                          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-6">{kpi.label}</p>
+                          <div className="flex items-end justify-between">
+                            <h3 className="text-4xl font-black text-white tracking-tighter">{kpi.value}</h3>
+                            <span className="text-[10px] font-mono tracking-widest text-zinc-600">{kpi.growth}</span>
+                          </div>
+                        </motion.div>
+                      ));
+                    })()}
                   </div>
 
                   {/* Main Activity Chart */}
@@ -454,21 +518,26 @@ export default function DashboardPage() {
                         </h4>
                      </div>
                      <div className="divide-y divide-zinc-900">
-                       {portfolio.projects?.slice(0, 3).map((project: any, i: number) => (
-                          <div key={project.id} className="p-6 px-8 flex items-center justify-between hover:bg-zinc-900/50 transition">
-                             <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-mono text-xs text-zinc-400">0{i+1}</div>
-                                <div>
-                                   <p className="font-bold text-white text-sm tracking-tight">{project.title}</p>
-                                   <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{project.category || 'General'}</p>
-                                </div>
+                       {portfolio.projects?.length > 0 ? (
+                         [...portfolio.projects]
+                           .sort((a: any, b: any) => (b.view_count || 0) - (a.view_count || 0))
+                           .slice(0, 5)
+                           .map((project: any, i: number) => (
+                             <div key={project.id} className="p-6 px-8 flex items-center justify-between hover:bg-zinc-900/50 transition">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-mono text-xs text-zinc-400">0{i+1}</div>
+                                  <div>
+                                     <p className="font-bold text-white text-sm tracking-tight">{project.title}</p>
+                                     <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{project.category || 'General'}</p>
+                                  </div>
+                               </div>
+                               <div className="text-right">
+                                  <p className="font-bold text-white tracking-tight">{(project.view_count || 0).toLocaleString()}</p>
+                                  <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Views</p>
+                               </div>
                              </div>
-                             <div className="text-right">
-                                <p className="font-bold text-white tracking-tight">{Math.floor(Math.random() * 8000 + 1500).toLocaleString()}</p>
-                                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Views</p>
-                             </div>
-                          </div>
-                       )) || (
+                           ))
+                       ) : (
                           <div className="p-12 text-center text-zinc-500 font-mono text-xs uppercase tracking-widest">No data mapped yet.</div>
                        )}
                      </div>
@@ -602,8 +671,11 @@ export default function DashboardPage() {
                           Current Plan
                         </button>
                       ) : (
-                        <button disabled className="w-full text-center py-4 opacity-50 border border-zinc-800 text-zinc-500 font-bold uppercase tracking-widest text-[11px] rounded transition cursor-not-allowed">
-                          Downgrade Unavailable
+                        <button 
+                          onClick={handleDowngrade}
+                          className="w-full text-center py-4 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-900 font-bold uppercase tracking-widest text-[11px] rounded transition"
+                        >
+                          Downgrade to Free
                         </button>
                       )}
                     </div>
