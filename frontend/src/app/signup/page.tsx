@@ -71,10 +71,12 @@ export default function SignupPage() {
           />
         </div>
 
-        {/* Content */}
-        <div className="relative z-20 flex justify-end">
-           <FolioLogo iconSize={32} className="text-2xl flex-row-reverse" />
+        {/* Logo */}
+        <div className="relative z-50">
+           <FolioLogo iconSize={24} />
         </div>
+
+
 
         <div className="relative z-20 text-right">
           <motion.h1 
@@ -98,10 +100,11 @@ export default function SignupPage() {
       {/* Left side: Form */}
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-32 relative bg-[#050505]">
         
-        {/* Mobile Header hidden on Desktop */}
-        <div className="md:hidden absolute top-8 right-8 flex items-center gap-2">
-           <FolioLogo iconSize={24} className="text-xl flex-row-reverse" />
+        {/* Mobile Logo */}
+        <div className="md:hidden absolute top-10 left-10 z-50">
+           <FolioLogo iconSize={24} />
         </div>
+        <div className="md:hidden h-20" /> {/* Spacer */}
 
         <motion.div 
           initial={{ opacity: 0, x: -20 }}

@@ -6,6 +6,7 @@ import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
 import { MapPin, CalendarClock, Briefcase, ExternalLink, Sparkles, Send, Play, Camera, CheckCircle2, Download } from 'lucide-react';
 import FolioLogo from '@/components/FolioLogo';
+import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
 
 export default function PortfolioView({ params }: { params: Promise<{ subdomain: string }> }) {
   const resolvedParams = use(params);
@@ -48,8 +49,10 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
       
       {/* Navigation */}
       <nav className="fixed top-0 inset-x-0 z-50 mix-blend-difference px-6 lg:px-12 py-8 flex justify-between items-center pointer-events-none">
-         <div className="pointer-events-auto">
-           <h1 className="text-xl font-bold tracking-tighter uppercase">{portfolio.title}</h1>
+         <div className="pointer-events-auto flex items-center gap-4">
+           <FolioLogo iconSize={20} />
+           <div className="w-px h-4 bg-white/20" />
+           <h1 className="text-lg font-bold tracking-tighter uppercase">{portfolio.title}</h1>
          </div>
          <div className="flex items-center gap-6 pointer-events-auto">
             {portfolio.booking_link && (
@@ -254,6 +257,13 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                            </div>
                         )}
                      </div>
+                     {/* ── Project Story Timeline ── */}
+                     <ProjectStoryTimeline
+                        projectId={project.id}
+                        projectTitle={project.title}
+                        initialStory={project.story}
+                        readOnly={true}
+                     />
                   </div>
                </motion.div>
             ))}
@@ -310,24 +320,54 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             </div>
 
             <div className="flex-1 bg-black p-8 lg:p-12 border border-zinc-900">
-               <form className="flex flex-col gap-8" onSubmit={(e) => { e.preventDefault(); alert("Inquiry sent directly to the creator."); }}>
+               <form 
+                 className="flex flex-col gap-8" 
+                 onSubmit={async (e) => { 
+                   e.preventDefault();
+                   const form = e.currentTarget;
+                   const formData = new FormData(form);
+                   const data = {
+                     name: formData.get('name') as string,
+                     email: formData.get('email') as string,
+                     project_details: formData.get('details') as string
+                   };
+
+                   
+                   try {
+                     const res = await fetch(`http://localhost:8000/portfolios/${portfolio.id}/inquire`, {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify(data)
+                     });
+                     if (res.ok) {
+                       alert("Proposition sent successfully! The creator will review and reach out.");
+                       form.reset();
+                     } else {
+                       alert("Failed to send. Please check your connection.");
+                     }
+                   } catch (err) {
+                     alert("Something went wrong. Please try again later.");
+                   }
+                 }}
+               >
                   <div>
                     <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Your Name / Agency</label>
-                    <input type="text" required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors" />
+                    <input name="name" type="text" required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Email Address</label>
-                    <input type="email" required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors" />
+                    <input name="email" type="email" required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Project Details</label>
-                    <textarea required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors h-20 resize-none" />
+                    <textarea name="details" required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors h-20 resize-none" />
                   </div>
                   <button type="submit" className="w-full py-5 bg-white text-black font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-zinc-200 transition flex justify-center items-center gap-3">
                      <Send className="w-4 h-4" /> Send Proposition
                   </button>
                </form>
             </div>
+
          </div>
       </section>
 

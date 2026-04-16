@@ -32,14 +32,67 @@ class TwoFactorVerify(BaseModel):
 class ForgotPassword(BaseModel):
     email: EmailStr
 
+# Step 2: User submits the OTP code to verify their email identity
+class VerifyOTP(BaseModel):
+    email: EmailStr
+    otp: str
+
+# Step 3: User provides the verified OTP + new password together
+class ResetPasswordOTP(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+
+# Legacy token-based reset (kept for backward compatibility)
 class ResetPassword(BaseModel):
     email: EmailStr
     token: str
     new_password: str
 
-    
-    
-from typing import Optional
+# ─── Project Story Schemas ─────────────────────────────────────────────────
+
+class StoryMediaItem(BaseModel):
+    """A single uploaded asset within a story stage."""
+    type: str      # 'image' or 'video'
+    url: str       # presigned URL or public URL
+    key: str       # S3 key for deletion
+
+class RevisionEntry(BaseModel):
+    """A single revision round."""
+    round: int
+    note: Optional[str] = None
+    media: list[StoryMediaItem] = []
+
+class ProjectStoryResponse(BaseModel):
+    id: int
+    project_id: int
+    brief_note:       Optional[str] = None
+    brief_media:      list[dict] = []
+    storyboard_note:  Optional[str] = None
+    storyboard_media: list[dict] = []
+    rough_cut_note:   Optional[str] = None
+    rough_cut_media:  list[dict] = []
+    revisions_note:   Optional[str] = None
+    revisions_data:   list[dict] = []
+    final_note:       Optional[str] = None
+    final_media:      list[dict] = []
+    updated_at:       Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class ProjectStoryUpdate(BaseModel):
+    """Partial update for any stage — only send what changed."""
+    brief_note:       Optional[str] = None
+    brief_media:      Optional[list[dict]] = None
+    storyboard_note:  Optional[str] = None
+    storyboard_media: Optional[list[dict]] = None
+    rough_cut_note:   Optional[str] = None
+    rough_cut_media:  Optional[list[dict]] = None
+    revisions_note:   Optional[str] = None
+    revisions_data:   Optional[list[dict]] = None
+    final_note:       Optional[str] = None
+    final_media:      Optional[list[dict]] = None
 
 # What the user sends us to create a portfolio
 class PortfolioCreate(BaseModel):
@@ -106,6 +159,7 @@ class ProjectResponse(BaseModel):
     media_url: Optional[str]
     raw_media_url: Optional[str] = None
     created_at: datetime
+    story: Optional[ProjectStoryResponse] = None
 
     @field_validator("media_url", "raw_media_url", mode="after")
     @classmethod
@@ -118,6 +172,22 @@ class ProjectResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class InquiryCreate(BaseModel):
+    name: str
+    email: EmailStr
+    project_details: str
+
+class InquiryResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    project_details: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class MatchRequest(BaseModel):
     reference_text: str
 
@@ -125,5 +195,7 @@ class MatchResult(BaseModel):
     portfolio: PortfolioResponse
     match_score: int
     match_reason: str
+
+
 
 PortfolioResponse.model_rebuild()

@@ -4,8 +4,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from auth import get_current_user
 from fastapi import File, UploadFile, Form
+from datetime import datetime, timedelta, timezone
+import random
 
-import s3_utils # Import your new S3 logic
+import s3_utils  # Import your new S3 logic
+import email_utils  # OTP email utility
 
 # Import our files
 import models, schemas, auth
@@ -62,13 +65,13 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 
     # 2FA CHECK
     if user.is_2fa_enabled:
-        import random
-        # Generate a fake 6-digit code for testing (in reality send via email/sms)
         code = str(random.randint(100000, 999999))
         user.two_factor_code = code
         db.commit()
-        print(f"--- 2FA CODE FOR {user.email}: {code} ---")
+        # Dispatch verification email
+        email_utils.send_2fa_email(user.email, code)
         return {"access_token": None, "token_type": "bearer", "requires_2fa": True}
+
 
     access_token = auth.create_access_token(data={"sub": user.email, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer", "requires_2fa": False}
@@ -94,16 +97,68 @@ def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depend
 
 @app.post("/forgot-password")
 def forgot_password(data: schemas.ForgotPassword, db: Session = Depends(get_db)):
+    """Step 1: Generate a 6-digit OTP and email it to the user."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
-    import uuid
-    if user:
-        reset_token = str(uuid.uuid4())
-        user.reset_token = reset_token
-        db.commit()
-        print(f"--- RESET TOKEN FOR {user.email}: {reset_token} ---")
-    # Always return 200 for security
-    return {"message": "If that email exists, a reset link has been sent."}
 
+    if user:
+        # Generate a cryptographically-adequate 6-digit OTP
+        otp = f"{random.SystemRandom().randint(0, 999999):06d}"
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+        user.reset_otp = otp
+        user.reset_otp_expires_at = expires_at
+        db.commit()
+
+        # Send the OTP via email (falls back to console print if SMTP not configured)
+        email_utils.send_otp_email(data.email, otp)
+
+    # Always return 200 to prevent email enumeration
+    return {"message": "If that email exists, a recovery code has been dispatched."}
+
+
+@app.post("/verify-otp")
+def verify_otp(data: schemas.VerifyOTP, db: Session = Depends(get_db)):
+    """Step 2: Validate the OTP without consuming it (confirms code is correct before asking for new password)."""
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+
+    if not user or not user.reset_otp or user.reset_otp != data.otp:
+        raise HTTPException(status_code=400, detail="Invalid or incorrect recovery code.")
+
+    # Check expiry — make reset_otp_expires_at timezone-aware for comparison
+    expires_at = user.reset_otp_expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(status_code=400, detail="Recovery code has expired. Please request a new one.")
+
+    return {"message": "Code verified. You may now set a new password."}
+
+
+@app.post("/reset-password-otp")
+def reset_password_otp(data: schemas.ResetPasswordOTP, db: Session = Depends(get_db)):
+    """Step 3: Validate OTP + set the new password atomically."""
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+
+    if not user or not user.reset_otp or user.reset_otp != data.otp:
+        raise HTTPException(status_code=400, detail="Invalid or incorrect recovery code.")
+
+    expires_at = user.reset_otp_expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(status_code=400, detail="Recovery code has expired. Please request a new one.")
+
+    # All checks passed — update password and clear OTP
+    user.hashed_password = auth.get_password_hash(data.new_password)
+    user.reset_otp = None
+    user.reset_otp_expires_at = None
+    db.commit()
+    return {"message": "Password has been successfully reset. You may now log in."}
+
+
+# ---- Legacy UUID token reset (kept for backward compatibility) ----
 @app.post("/reset-password")
 def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == data.email).first()
@@ -115,9 +170,10 @@ def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Password has been successfully reset."}
 
-@app.get("/users/me")
+@app.get("/users/me", response_model=schemas.UserResponse)
 def get_user_me(current_user: models.User = Depends(get_current_user)):
-    return {"subscription_tier": current_user.subscription_tier or "free"}
+    return current_user
+
 
 # --- PORTFOLIO ROUTES ---
 
@@ -406,3 +462,218 @@ def downgrade_plan(db: Session = Depends(get_db), current_user: models.User = De
     current_user.subscription_tier = 'free'
     db.commit()
     return {'message': 'Plan downgraded to free. No refund processed as per policy.'}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROJECT STORY ROUTES
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_project_for_user(project_id: int, current_user: models.User, db: Session) -> models.Project:
+    """Helper: fetch project and verify it belongs to the current user."""
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    portfolio = db.query(models.Portfolio).filter(
+        models.Portfolio.id == project.portfolio_id,
+        models.Portfolio.user_id == current_user.id
+    ).first()
+    if not portfolio:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return project
+
+
+@app.get("/projects/{project_id}/story", response_model=schemas.ProjectStoryResponse)
+def get_project_story(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Fetch the story for a project (auto-creates it if it doesn't exist yet)."""
+    project = _get_project_for_user(project_id, current_user, db)
+
+    story = db.query(models.ProjectStory).filter(
+        models.ProjectStory.project_id == project.id
+    ).first()
+
+    if not story:
+        story = models.ProjectStory(
+            project_id=project.id,
+            brief_media=[], storyboard_media=[], rough_cut_media=[],
+            revisions_data=[], final_media=[]
+        )
+        db.add(story)
+        db.commit()
+        db.refresh(story)
+
+    return story
+
+
+@app.put("/projects/{project_id}/story", response_model=schemas.ProjectStoryResponse)
+def update_project_story(
+    project_id: int,
+    data: schemas.ProjectStoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Update text notes or replace media arrays for any stage."""
+    project = _get_project_for_user(project_id, current_user, db)
+
+    story = db.query(models.ProjectStory).filter(
+        models.ProjectStory.project_id == project.id
+    ).first()
+    if not story:
+        story = models.ProjectStory(
+            project_id=project.id,
+            brief_media=[], storyboard_media=[], rough_cut_media=[],
+            revisions_data=[], final_media=[]
+        )
+        db.add(story)
+
+    update_dict = data.model_dump(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(story, key, value)
+
+    story.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(story)
+    return story
+
+
+@app.post("/projects/{project_id}/story/upload")
+async def upload_story_media(
+    project_id: int,
+    stage: str = Form(...),         # brief | storyboard | rough_cut | revisions | final
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Upload a screenshot or short clip for a specific story stage."""
+    valid_stages = {"brief", "storyboard", "rough_cut", "revisions", "final"}
+    if stage not in valid_stages:
+        raise HTTPException(status_code=400, detail=f"Invalid stage. Choose from: {valid_stages}")
+
+    project = _get_project_for_user(project_id, current_user, db)
+
+    story = db.query(models.ProjectStory).filter(
+        models.ProjectStory.project_id == project.id
+    ).first()
+    if not story:
+        story = models.ProjectStory(
+            project_id=project.id,
+            brief_media=[], storyboard_media=[], rough_cut_media=[],
+            revisions_data=[], final_media=[]
+        )
+        db.add(story)
+        db.commit()
+        db.refresh(story)
+
+    # Determine media type from MIME
+    content_type = file.content_type or ""
+    if content_type.startswith("image/"):
+        media_type = "image"
+    elif content_type.startswith("video/"):
+        media_type = "video"
+    else:
+        raise HTTPException(status_code=400, detail="Only image or video files are accepted.")
+
+    # Upload to S3
+    s3_key = s3_utils.upload_file_to_s3(file.file, file.filename)
+    if not s3_key:
+        raise HTTPException(status_code=500, detail="Upload to cloud storage failed.")
+
+    presigned = s3_utils.get_presigned_url(s3_key)
+    media_item = {"type": media_type, "url": presigned, "key": s3_key}
+
+    # Append to the correct stage media list
+    media_field = f"{stage}_media"
+    if stage == "revisions":
+        # Revisions use a flat media list inside revisions_data for the latest round
+        rev_data = list(story.revisions_data or [])
+        if not rev_data:
+            rev_data.append({"round": 1, "note": "", "media": []})
+        rev_data[-1]["media"] = rev_data[-1].get("media", []) + [media_item]
+        story.revisions_data = rev_data
+    else:
+        current_list = list(getattr(story, media_field) or [])
+        current_list.append(media_item)
+        setattr(story, media_field, current_list)
+
+    story.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(story)
+    return {"message": "Media uploaded successfully.", "item": media_item, "story_id": story.id}
+
+
+@app.delete("/projects/{project_id}/story/media")
+def delete_story_media(
+    project_id: int,
+    stage: str,
+    key: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Remove a single media item from a story stage by its S3 key."""
+    project = _get_project_for_user(project_id, current_user, db)
+
+    story = db.query(models.ProjectStory).filter(
+        models.ProjectStory.project_id == project.id
+    ).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+
+    if stage == "revisions":
+        rev_data = list(story.revisions_data or [])
+        for rev in rev_data:
+            rev["media"] = [m for m in rev.get("media", []) if m.get("key") != key]
+        story.revisions_data = rev_data
+    else:
+        media_field = f"{stage}_media"
+        current_list = list(getattr(story, media_field) or [])
+        setattr(story, media_field, [m for m in current_list if m.get("key") != key])
+
+    story.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Media item removed."}
+
+
+@app.post("/portfolios/{portfolio_id}/inquire")
+def send_inquiry(portfolio_id: int, inquiry: schemas.InquiryCreate, db: Session = Depends(get_db)):
+    db_portfolio = db.query(models.Portfolio).filter(models.Portfolio.id == portfolio_id).first()
+    if not db_portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    
+    db_inquiry = models.Inquiry(
+        portfolio_id=portfolio_id,
+        name=inquiry.name,
+        email=inquiry.email,
+        project_details=inquiry.project_details
+    )
+
+    db.add(db_inquiry)
+    db.commit()
+    return {"message": "Inquiry sent successfully"}
+
+@app.get("/inquiries/me", response_model=list[schemas.InquiryResponse])
+def get_my_inquiries(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        return []
+    
+    inquiries = db.query(models.Inquiry).filter(models.Inquiry.portfolio_id == portfolio.id).order_by(models.Inquiry.created_at.desc()).all()
+    return inquiries
+
+@app.patch("/inquiries/{inquiry_id}/read")
+def mark_inquiry_read(inquiry_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+    db_inquiry = db.query(models.Inquiry).filter(models.Inquiry.id == inquiry_id, models.Inquiry.portfolio_id == portfolio.id).first()
+    if not db_inquiry:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    
+    db_inquiry.is_read = True
+    db.commit()
+    return {"message": "Inquiry marked as read"}
+
+

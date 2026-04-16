@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FolioLogo from '@/components/FolioLogo';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
+import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
 
 const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 
@@ -28,7 +29,8 @@ import {
   Zap,
   Check,
   Shield,
-  Sparkles
+  Sparkles,
+  Mail
 } from 'lucide-react';
 export default function DashboardPage() {
   return (
@@ -74,6 +76,10 @@ function DashboardContent() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
 
+  // Leads/Inquiries State
+  const [inquiries, setInquiries] = useState<any[]>([]);
+  const [isInquiriesLoading, setIsInquiriesLoading] = useState(false);
+
   // New: Payment status notification
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
@@ -115,7 +121,9 @@ function DashboardContent() {
       ]);
       setPortfolio(portRes.data);
       setSubTier(userRes.data.subscription_tier);
+      setTwoFactorEnabled(userRes.data.is_2fa_enabled);
       setIsLoading(false);
+
     } catch (err: any) {
       if (err.response?.status !== 404) {
         console.error("Failed to load portfolio", err);
@@ -123,6 +131,24 @@ function DashboardContent() {
       setIsLoading(false);
     }
   };
+
+  const fetchInquiries = async () => {
+    setIsInquiriesLoading(true);
+    try {
+      const res = await api.get('/inquiries/me');
+      setInquiries(res.data);
+    } catch (err) {
+      console.error("Failed to load inquiries", err);
+    } finally {
+      setIsInquiriesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'inquiries') {
+      fetchInquiries();
+    }
+  }, [activeTab]);
 
   const handleCreatePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -318,8 +344,9 @@ function DashboardContent() {
           <aside className="w-72 border-r border-zinc-900 bg-[#050505] flex flex-col justify-between hidden md:flex shrink-0">
             <div>
               <div className="p-8 border-b border-zinc-900">
-                <FolioLogo />
+                <FolioLogo iconSize={24} />
               </div>
+
 
               <div className="px-6 py-8 flex flex-col gap-2">
                 <p className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-600 mb-4 pl-4">Menu</p>
@@ -335,6 +362,12 @@ function DashboardContent() {
                   className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
                 >
                   <BarChart className="w-4 h-4" /> Telemetry
+                </button>
+                <button 
+                  onClick={() => setActiveTab('inquiries')}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'inquiries' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                >
+                  <Mail className="w-4 h-4" /> Incoming Leads
                 </button>
                 <button 
                   onClick={() => setActiveTab('settings')}
@@ -426,6 +459,11 @@ function DashboardContent() {
                             </div>
                           </div>
                         </div>
+                        {/* ── Project Story Timeline ── */}
+                        <ProjectStoryTimeline
+                          projectId={project.id}
+                          projectTitle={project.title}
+                        />
                       </motion.div>
                     ))
                   ) : (
@@ -727,6 +765,64 @@ function DashboardContent() {
                   </div>
                 </motion.div>
               )}
+
+              {activeTab === 'inquiries' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                  <div className="flex justify-between items-end mb-8">
+                    <div>
+                      <h2 className="text-4xl font-black tracking-tighter uppercase mb-2">Incoming Leads</h2>
+                      <p className="text-zinc-500 font-light max-w-xl">Review and manage project propositions sent from your portfolio studio.</p>
+                    </div>
+                  </div>
+
+                  {isInquiriesLoading ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-zinc-900/10 border border-zinc-900 rounded-xl">
+                      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin mb-4" />
+                      <p className="tracking-widest uppercase text-xs text-zinc-600">Syncing Inbox</p>
+                    </div>
+                  ) : inquiries.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-32 bg-zinc-900/10 border border-zinc-900 rounded-xl">
+                      <Mail className="w-12 h-12 text-zinc-800 mb-6" />
+                      <h3 className="text-xl font-bold text-zinc-400 mb-2">No active leads found</h3>
+                      <p className="text-zinc-600 font-light">Project inquiries will appear here as they arrive.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {inquiries.map((lead) => (
+                        <div key={lead.id} className="bg-[#050505] border border-zinc-900 p-6 rounded-xl hover:border-zinc-700 transition flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                               <h4 className="text-xl font-bold text-white">{lead.name}</h4>
+                               {!lead.is_read && <span className="bg-brand w-2 h-2 rounded-full" />}
+                            </div>
+                            <p className="text-brand text-sm font-mono tracking-wide mb-4">{lead.email}</p>
+                            <p className="text-zinc-400 font-light leading-relaxed max-w-2xl">{lead.project_details}</p>
+
+                            <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest mt-6">Received — {new Date(lead.created_at).toLocaleDateString()} {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                          <div className="flex gap-4">
+                             <a href={`mailto:${lead.email}`} className="px-6 py-3 bg-white text-black text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition">
+                               Reply
+                             </a>
+                             {!lead.is_read && (
+                                <button 
+                                  onClick={async () => {
+                                    await api.patch(`/inquiries/${lead.id}/read`);
+                                    fetchInquiries();
+                                  }}
+                                  className="px-6 py-3 border border-zinc-800 text-zinc-400 text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition"
+                                >
+                                  Archive
+                                </button>
+                             )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
 
             </div>
           </main>
