@@ -62,6 +62,9 @@ Foliohub/
 5. Configure `.env` with AWS and Stripe keys.
 6. `uvicorn main:app --reload`
 
+# Install FFmpeg
+winget install ffmpeg
+
 ### 2. Frontend Setup
 1. `cd frontend`
 2. `npm install`

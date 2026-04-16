@@ -24,3 +24,6 @@ frontend/.env
 # OS files
 .DS_Store
 Thumbs.db
+
+# FFmpeg binaries
+backend/*.exe
