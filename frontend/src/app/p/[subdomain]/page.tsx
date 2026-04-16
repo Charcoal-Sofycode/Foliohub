@@ -204,9 +204,14 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                   <div className="aspect-video bg-zinc-900 w-full mb-6 overflow-hidden relative">
                      {project.raw_media_url && project.media_url ? (
                         <BeforeAfterPlayer rawUrl={project.raw_media_url} finalUrl={project.media_url} title={project.title} />
-                     ) : project.media_url ? (
-                        <PortfolioPlayer url={project.media_url} title={project.title} />
-                     ) : null}
+                      ) : project.media_url ? (
+                         <PortfolioPlayer 
+                           url={project.media_url} 
+                           title={project.title}
+                           optimizedUrl={project.optimized_url}
+                           transcodingStatus={project.transcoding_status}
+                         />
+                      ) : null}
                   </div>
                   <div>
                      <div className="flex justify-between items-start mb-2 gap-4">

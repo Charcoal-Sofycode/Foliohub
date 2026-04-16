@@ -75,3 +75,31 @@ def get_presigned_url(file_url: str, expiration=3600):
     except Exception as e:
         print(f"Error generating presigned url: {e}")
         return file_url
+
+def generate_presigned_post(file_name: str, file_type: str, expiration=3600):
+    """
+    Generates a presigned POST URL for direct client-side upload to S3.
+    """
+    try:
+        s3_client = get_s3_client()
+        config = get_config()
+
+        file_extension = file_name.split(".")[-1]
+        object_name = f"{uuid.uuid4()}.{file_extension}"
+
+        response = s3_client.generate_presigned_post(
+            Bucket=config["bucket"],
+            Key=object_name,
+            Fields={"Content-Type": file_type},
+            Conditions=[{"Content-Type": file_type}],
+            ExpiresIn=expiration
+        )
+        
+        # Add the full URL for later reference
+        response["file_url"] = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{object_name}"
+        response["object_key"] = object_name
+        
+        return response
+    except Exception as e:
+        print(f"Error generating presigned post: {e}")
+        return None

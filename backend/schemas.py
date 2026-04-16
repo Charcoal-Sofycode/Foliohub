@@ -141,10 +141,16 @@ class PortfolioResponse(BaseModel):
     skill_color: Optional[int] = 50
     projects: list["ProjectResponse"] = []
 
-    class Config:
-        from_attributes = True
+class ProjectUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    role: Optional[str] = None
+    tools_used: Optional[str] = None
+    category: Optional[str] = None
+    timeline_breakdown: Optional[str] = None
 
 class ProjectResponse(BaseModel):
+
     id: int
     portfolio_id: int
     title: str
@@ -158,10 +164,13 @@ class ProjectResponse(BaseModel):
     is_verified: bool = False
     media_url: Optional[str]
     raw_media_url: Optional[str] = None
+    optimized_url: Optional[str] = None
+    transcoding_status: str = "pending"
     created_at: datetime
     story: Optional[ProjectStoryResponse] = None
 
-    @field_validator("media_url", "raw_media_url", mode="after")
+
+    @field_validator("media_url", "raw_media_url", "optimized_url", mode="after")
     @classmethod
     def presign_url(cls, v):
         import s3_utils

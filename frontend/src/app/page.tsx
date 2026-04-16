@@ -82,18 +82,20 @@ export default function Home() {
         onMouseLeave={() => setIsHoveringHero(false)}
       >
         <div className="sticky top-0 w-full h-screen overflow-hidden">
-          
-          <motion.div style={{ scale: videoScale, opacity: videoOpacity }} className="w-full h-full relative">
-            <div className="absolute inset-0 bg-black/40 z-10" />
+          <div className="w-full h-full relative bg-black" key="hero-video-lite">
             <video 
               autoPlay 
               loop 
               muted 
               playsInline 
-              className="w-full h-full object-cover filter contrast-125 saturate-50"
-              src="https://www.w3schools.com/html/mov_bbb.mp4" 
+              preload="metadata"
+              className="w-full h-full object-cover relative z-0"
+              src="/hero-video.mp4" 
             />
-          </motion.div>
+            {/* Simple Overlay */}
+            <div className="absolute inset-0 bg-black/60 z-10 pointer-events-none" />
+          </div>
+
 
           <motion.div 
             style={{ y: titleY, opacity: titleOpacity }}
@@ -113,9 +115,9 @@ export default function Home() {
               <p className="text-xs tracking-[0.3em] uppercase opacity-50 font-mono">Scroll to Discover</p>
             </motion.div>
           </motion.div>
-
         </div>
       </div>
+
 
       {/* 
         SECTION 2: EDITORIAL SCROLL (A24 / APPLE VIBES)
@@ -131,8 +133,9 @@ export default function Home() {
                   loop 
                   muted 
                   playsInline 
+                  preload="metadata"
                   className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-1000 ease-in-out"
-                  src="https://www.w3schools.com/html/mov_bbb.mp4" 
+                  src="/editorial.mp4" 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-10">
                   <p className="font-mono text-xs uppercase tracking-[0.2em]">01 / Flawless Streaming</p>
@@ -204,8 +207,9 @@ export default function Home() {
                 loop 
                 muted 
                 playsInline 
+                preload="metadata"
                 className="w-full h-full object-cover filter grayscale group-hover:grayscale-0 transition-all duration-700"
-                src="https://www.w3schools.com/html/mov_bbb.mp4" 
+                src="/hover.mp4" 
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition duration-500">
                  <span className="text-white font-bold tracking-[0.3em] uppercase mix-blend-overlay text-xl">Hover Focus</span>

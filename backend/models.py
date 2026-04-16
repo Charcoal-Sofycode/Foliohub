@@ -79,6 +79,8 @@ class Project(Base):
     # Media Links (Will point to your AWS S3 buckets)
     media_url = Column(String, nullable=True) 
     raw_media_url = Column(String, nullable=True) 
+    optimized_url = Column(String, nullable=True) # Optimized H.264 version
+    transcoding_status = Column(String, default="pending") # "pending", "processing", "completed", "failed"
     thumbnail_url = Column(String, nullable=True)
     
     view_count = Column(Integer, default=0)

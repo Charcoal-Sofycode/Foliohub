@@ -30,7 +30,11 @@ import {
   Check,
   Shield,
   Sparkles,
-  Mail
+  Mail,
+  Trash2,
+  Edit,
+  Save,
+  AlertCircle
 } from 'lucide-react';
 export default function DashboardPage() {
   return (
@@ -68,6 +72,11 @@ function DashboardContent() {
   const [uploadTimeline, setUploadTimeline] = useState("");
   const [uploadProjectFile, setUploadProjectFile] = useState<File | null>(null);
   const [uploadRawFile, setUploadRawFile] = useState<File | null>(null);
+  
+  // Edit State
+  const [editingProject, setEditingProject] = useState<any>(null);
+  const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
+
 
   // Settings State
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -94,24 +103,53 @@ function DashboardContent() {
     }
     
     const initializeDashboard = async () => {
+      // initial fetch
+      await fetchPortfolio();
+      
       if (sessionId) {
         setIsVerifyingPayment(true);
         try {
           // Explicitly verify session with backend
-          await api.get(`/verify-session/${sessionId}`);
-          // Clear the session_id from URL without refreshing
-          window.history.replaceState({}, '', '/dashboard');
-        } catch (e) {
-          console.error("Verification failed", e);
+          const res = await api.get(`/verify-payment?session_id=${sessionId}`);
+          if (res.data.status === 'success') {
+             setSubTier('premium');
+          }
+        } catch(e) {
+             console.error("Payment Verification Error", e);
         } finally {
-          setIsVerifyingPayment(false);
+             setIsVerifyingPayment(false);
         }
       }
-      fetchPortfolio();
     };
 
     initializeDashboard();
-  }, [router, sessionId]);
+
+    // SMART POLLING: Only ping if active work is actually happening
+    const pollInterval = setInterval(async () => {
+       // We fetch the LATEST data to see if we still need to poll
+       try {
+         const res = await api.get('/portfolios/me');
+         const projects = res.data.projects || [];
+         
+         const isStillProcessing = projects.some((p: any) => 
+           p.transcoding_status === 'pending' || p.transcoding_status === 'processing'
+         );
+
+         // Sync the local state
+         setPortfolio(res.data);
+         
+         if (!isStillProcessing) {
+           console.log("DEBUG: All assets live. Polling terminated.");
+           clearInterval(pollInterval);
+         }
+       } catch (e) {
+         console.error("Polling Sync Error", e);
+       }
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [sessionId, portfolio?.projects?.length]); // Re-run if list changes
+
 
   const fetchPortfolio = async () => {
     try {
@@ -161,6 +199,48 @@ function DashboardContent() {
     }
   };
 
+
+  const uploadToS3Direct = async (file: File, onProgress?: (pct: number) => void) => {
+    try {
+      // 1. Get upload params from our backend
+      const res = await api.get(`/generate-upload-url?file_name=${encodeURIComponent(file.name)}&file_type=${encodeURIComponent(file.type)}`);
+      const { url, fields, object_key } = res.data;
+
+      // 2. Construct form data for S3
+      const formData = new FormData();
+      Object.entries(fields).forEach(([k, v]) => formData.append(k, v as string));
+      formData.append('file', file);
+
+      // 3. Perform the actual upload to S3 directly
+      return new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        
+        if (onProgress) {
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              onProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          };
+        }
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(object_key);
+          } else {
+            console.error("S3 Response:", xhr.responseText);
+            reject(new Error(`S3 Upload Failed: ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network Error during S3 Upload'));
+        xhr.send(formData);
+      });
+    } catch (err) {
+      console.error("Presigned URL error:", err);
+      throw err;
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -170,29 +250,52 @@ function DashboardContent() {
     setUploadProgress(0);
 
     try {
+      // Step 1: Upload heavy files directly to S3
+      // We do this in sequence or parallel. For stability, let's do sequential or handle progress aggregate.
+      let media_key = "";
+      let raw_media_key = "";
+      let project_file_key = "";
+
+      // Track progress across all files
+      setUploadProgress(10); // Start
+      
+      console.log("Starting direct S3 uploads...");
+      
+      // Upload Main File
+      media_key = await uploadToS3Direct(selectedFile, (p) => setUploadProgress(10 + (p * 0.4)));
+
+      // Upload Raw File if exists
+      if (uploadRawFile) {
+        setUploadProgress(50);
+        raw_media_key = await uploadToS3Direct(uploadRawFile, (p) => setUploadProgress(50 + (p * 0.2)));
+      }
+
+      // Upload Project File if exists
+      if (uploadProjectFile) {
+        setUploadProgress(70);
+        project_file_key = await uploadToS3Direct(uploadProjectFile, (p) => setUploadProgress(70 + (p * 0.2)));
+      }
+
+      setUploadProgress(95);
+
+      // Step 2: Notify Backend with the S3 keys
       const formData = new FormData();
       formData.append('title', uploadTitle);
       formData.append('description', uploadDesc);
-      formData.append('file', selectedFile);
       formData.append('project_type', 'video');
       formData.append('category', uploadCategory);
+      
+      formData.append('media_key', media_key);
+      if (raw_media_key) formData.append('raw_media_key', raw_media_key);
+      if (project_file_key) formData.append('project_file_key', project_file_key);
+      
       if (uploadRole) formData.append('role', uploadRole);
       if (uploadTools) formData.append('tools_used', uploadTools);
       if (uploadTimeline) formData.append('timeline_breakdown', uploadTimeline);
-      if (uploadProjectFile) formData.append('project_file', uploadProjectFile);
-      if (uploadRawFile) formData.append('raw_file', uploadRawFile);
 
-      await api.post('/projects', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(percentCompleted);
-          }
-        }
-      });
+      await api.post('/projects', formData);
+
+      setUploadProgress(100);
 
       setTimeout(async () => {
         await fetchPortfolio();
@@ -211,10 +314,78 @@ function DashboardContent() {
       }, 1000);
       
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Upload failed. Please try again.');
+      console.error("Direct Upload Error:", err);
+      setError('Upload failed. Huge files might require high-speed internet or multiple attempts.');
       setIsUploading(false);
     }
   };
+
+  const handleDeleteProject = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this masterpiece forever? This action cannot be undone.')) return;
+    
+    setIsDeletingId(id);
+    try {
+      await api.delete(`/projects/${id}`);
+      await fetchPortfolio();
+    } catch (err) {
+      console.error("Delete Error:", err);
+      alert("Failed to delete project.");
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
+
+  const openEditModal = (project: any) => {
+    setEditingProject(project);
+    setUploadTitle(project.title);
+    setUploadDesc(project.description || "");
+    setUploadCategory(project.category || "general");
+    setUploadRole(project.role || "");
+    setUploadTools(project.tools_used || "");
+    setUploadTimeline(project.timeline_breakdown || "");
+    setIsModalOpen(true);
+  };
+
+  const handleUpdateProjectMetadata = async () => {
+    if (!editingProject) return;
+    setIsUploading(true);
+    try {
+      await api.put(`/projects/${editingProject.id}`, {
+        title: uploadTitle,
+        description: uploadDesc,
+        category: uploadCategory,
+        role: uploadRole,
+        tools_used: uploadTools,
+        timeline_breakdown: uploadTimeline
+      });
+      
+      await fetchPortfolio();
+      closeModal();
+    } catch (err) {
+      console.error("Update Error:", err);
+      alert("Failed to update metadata.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingProject(null);
+    setUploadTitle("");
+    setUploadDesc("");
+    setUploadCategory("general");
+    setUploadRole("");
+    setUploadTools("");
+    setUploadTimeline("");
+    setSelectedFile(null);
+    setUploadProjectFile(null);
+    setUploadRawFile(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+  };
+
+
 
   const handleUpdatePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -439,7 +610,12 @@ function DashboardContent() {
                           {project.raw_media_url && project.media_url ? (
                             <BeforeAfterPlayer rawUrl={project.raw_media_url} finalUrl={project.media_url} title={project.title} />
                           ) : project.media_url ? (
-                            <PortfolioPlayer url={project.media_url} title={project.title} />
+                            <PortfolioPlayer 
+                              url={project.media_url} 
+                              title={project.title}
+                              optimizedUrl={project.optimized_url}
+                              transcodingStatus={project.transcoding_status}
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-zinc-800">
                               <Play className="w-8 h-8" />
@@ -448,6 +624,35 @@ function DashboardContent() {
                           <div className="absolute top-3 left-3 bg-black/60 backdrop-blur text-white text-[10px] uppercase font-mono tracking-widest px-2 py-1 rounded-sm border border-white/10 pointer-events-none">
                              Video
                           </div>
+                          
+                          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                             <button 
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 openEditModal(project);
+                               }}
+                               className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-black transition pointer-events-auto"
+                               title="Edit Metadata"
+                             >
+                               <Edit className="w-3.5 h-3.5" />
+                             </button>
+                             <button 
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 handleDeleteProject(project.id);
+                               }}
+                               className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition pointer-events-auto"
+                               title="Delete Project"
+                             >
+                               {isDeletingId === project.id ? (
+                                 <div className="w-3 h-3 border border-red-500 border-t-transparent rounded-full animate-spin" />
+                               ) : (
+                                 <Trash2 className="w-3.5 h-3.5" />
+                               )}
+                             </button>
+                          </div>
+
+
                         </div>
                         <div className="p-6 flex-1 flex flex-col">
                           <h3 className="text-lg font-bold truncate text-white mb-2">{project.title}</h3>
@@ -858,10 +1063,16 @@ function DashboardContent() {
               
               <div className="mb-10">
                 <span className="text-[10px] uppercase font-mono tracking-[0.3em] text-zinc-500 mb-2 block">System Dialogue</span>
-                <h2 className="text-3xl font-black tracking-tighter">Ingest Media File</h2>
+                <h2 className="text-3xl font-black tracking-tighter">{editingProject ? 'Refine Asset Metadata' : 'Ingest Media File'}</h2>
               </div>
               
-              <form onSubmit={handleUpload} className="flex flex-col gap-8">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  editingProject ? handleUpdateProjectMetadata() : handleUpload(e);
+                }} 
+                className="flex flex-col gap-8"
+              >
                 
                 <div className="space-y-1">
                   <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Asset Title</label>
@@ -963,64 +1174,66 @@ function DashboardContent() {
                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Final Edit Video</label>
-                    <div className="relative group mt-2">
-                      <input 
-                        type="file" 
-                        accept="video/*"
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                        required
-                        disabled={isUploading}
-                      />
-                      <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
-                        {selectedFile ? (
-                          <>
-                            <CheckCircle2 className="w-6 h-6 text-white mb-2" />
-                            <p className="text-sm font-medium text-white max-w-sm shrink-0 truncate">{selectedFile.name}</p>
-                            <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
-                          </>
-                        ) : (
-                          <>
-                            <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
-                            <p className="text-xs font-bold text-white uppercase tracking-widest">Final Video</p>
-                            <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">MP4/WEBM</p>
-                          </>
-                        )}
+                {!editingProject && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Final Edit Video</label>
+                      <div className="relative group mt-2">
+                        <input 
+                          type="file" 
+                          accept="video/*"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                          required
+                          disabled={isUploading}
+                        />
+                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                          {selectedFile ? (
+                            <>
+                              <CheckCircle2 className="w-6 h-6 text-white mb-2" />
+                              <p className="text-sm font-medium text-white max-w-sm shrink-0 truncate">{selectedFile.name}</p>
+                              <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
+                              <p className="text-xs font-bold text-white uppercase tracking-widest">Final Video</p>
+                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">MP4/WEBM</p>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Raw Video <span className="text-zinc-600">(Before/After)</span></label>
-                    <div className="relative group mt-2">
-                      <input 
-                        type="file" 
-                        accept="video/*"
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                        onChange={(e) => setUploadRawFile(e.target.files?.[0] || null)}
-                        disabled={isUploading}
-                      />
-                      <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${uploadRawFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
-                        {uploadRawFile ? (
-                          <>
-                            <CheckCircle2 className="w-6 h-6 text-white mb-2" />
-                            <p className="text-sm font-medium text-white max-w-sm shrink-0 truncate">{uploadRawFile.name}</p>
-                            <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
-                          </>
-                        ) : (
-                          <>
-                            <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
-                            <p className="text-xs font-bold text-white uppercase tracking-widest">Raw Video</p>
-                            <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Optional</p>
-                          </>
-                        )}
+                    <div className="space-y-1">
+                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Raw Video <span className="text-zinc-600">(Before/After)</span></label>
+                      <div className="relative group mt-2">
+                        <input 
+                          type="file" 
+                          accept="video/*"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                          onChange={(e) => setUploadRawFile(e.target.files?.[0] || null)}
+                          disabled={isUploading}
+                        />
+                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${uploadRawFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                          {uploadRawFile ? (
+                            <>
+                              <CheckCircle2 className="w-6 h-6 text-white mb-2" />
+                              <p className="text-sm font-medium text-white max-w-sm shrink-0 truncate">{uploadRawFile.name}</p>
+                              <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
+                              <p className="text-xs font-bold text-white uppercase tracking-widest">Raw Video</p>
+                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Optional</p>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {error && (
                   <div className="p-4 border border-red-500/20 bg-red-500/5">
@@ -1047,16 +1260,16 @@ function DashboardContent() {
 
                 <button 
                   type="submit" 
-                  disabled={isUploading || !selectedFile}
+                  disabled={isUploading || (!editingProject && !selectedFile)}
                   className="w-full py-5 mt-4 bg-white hover:bg-zinc-200 text-black font-bold uppercase tracking-[0.2em] text-[11px] transition duration-200 disabled:opacity-50 flex items-center justify-center gap-3"
                 >
                   {isUploading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                      Uploading Media...
+                      {editingProject ? 'Syncing Metadata...' : 'Uploading Media...'}
                     </>
                   ) : (
-                    'Commence Upload'
+                    editingProject ? 'Save Metadata Changes' : 'Commence Upload'
                   )}
                 </button>
               </form>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ import random
 
 import s3_utils  # Import your new S3 logic
 import email_utils  # OTP email utility
+import transcoding_utils
 
 # Import our files
 import models, schemas, auth
@@ -158,7 +159,14 @@ def reset_password_otp(data: schemas.ResetPasswordOTP, db: Session = Depends(get
     return {"message": "Password has been successfully reset. You may now log in."}
 
 
-# ---- Legacy UUID token reset (kept for backward compatibility) ----
+@app.get("/generate-upload-url")
+def get_upload_url(file_name: str, file_type: str, current_user: models.User = Depends(get_current_user)):
+    """Generate a presigned post for direct S3 upload."""
+    data = s3_utils.generate_presigned_post(file_name, file_type)
+    if not data:
+        raise HTTPException(status_code=500, detail="Could not generate upload params.")
+    return data
+
 @app.post("/reset-password")
 def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == data.email).first()
@@ -244,19 +252,27 @@ def get_all_portfolios(db: Session = Depends(get_db)):
 
 @app.post("/projects", response_model=schemas.ProjectResponse)
 def create_project(
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
+
     description: str = Form(None),
     project_type: str = Form("video"),
     role: str = Form(None),
     tools_used: str = Form(None),
     category: str = Form("general"),
     timeline_breakdown: str = Form(None),
-    file: UploadFile = File(...),
+    file: UploadFile = File(None), # Made optional
     raw_file: UploadFile = File(None),
     project_file: UploadFile = File(None),
+    media_key: str = Form(None), # New: Direct S3 keys
+    raw_media_key: str = Form(None),
+    project_file_key: str = Form(None),
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user) # Locked to logged-in users
+    current_user: models.User = Depends(get_current_user)
 ):
+
+
+
     # 1. Find the user's portfolio
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
     if not portfolio:
@@ -268,18 +284,26 @@ def create_project(
         if project_count >= 5:
             raise HTTPException(status_code=403, detail="Free plan limit reached (5 edits maximum). Please upgrade your package.")
 
-    # 2. Upload the file to AWS S3
-    file_url = s3_utils.upload_file_to_s3(file.file, file.filename)
+    # 2. Resolve URLs (Either upload from stream or use direct key)
+    file_url = None
+    if media_key:
+        file_url = f"https://{s3_utils.get_config()['bucket']}.s3.{s3_utils.get_config()['region']}.amazonaws.com/{media_key}"
+    elif file:
+        file_url = s3_utils.upload_file_to_s3(file.file, file.filename)
     
     if not file_url:
-        raise HTTPException(status_code=500, detail="Failed to upload media to cloud storage.")
+        raise HTTPException(status_code=400, detail="Either a file or a media_key must be provided.")
         
     project_file_url = None
-    if project_file:
+    if project_file_key:
+        project_file_url = f"https://{s3_utils.get_config()['bucket']}.s3.{s3_utils.get_config()['region']}.amazonaws.com/{project_file_key}"
+    elif project_file:
         project_file_url = s3_utils.upload_file_to_s3(project_file.file, project_file.filename)
         
     raw_media_url = None
-    if raw_file:
+    if raw_media_key:
+        raw_media_url = f"https://{s3_utils.get_config()['bucket']}.s3.{s3_utils.get_config()['region']}.amazonaws.com/{raw_media_key}"
+    elif raw_file:
         raw_media_url = s3_utils.upload_file_to_s3(raw_file.file, raw_file.filename)
 
     is_verified = False
@@ -305,10 +329,50 @@ def create_project(
     db.add(new_project)
     db.commit()
     db.refresh(new_project)
+
+    # 4. Trigger Transcoding in background if it's a video
+    if project_type == "video":
+        background_tasks.add_task(transcoding_utils.transcode_video, new_project.id)
+
     
     return new_project
 
+
+@app.put("/projects/{project_id}", response_model=schemas.ProjectResponse)
+def update_project(
+    project_id: int,
+    project_update: schemas.ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    project = _get_project_for_user(project_id, current_user, db)
+    
+    update_data = project_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(project, key, value)
+    
+    db.commit()
+    db.refresh(project)
+    return project
+
+@app.delete("/projects/{project_id}")
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    project = _get_project_for_user(project_id, current_user, db)
+    
+    # Optional: Delete file from S3 here if you want to save space
+    # s3_utils.delete_file_from_s3(project.media_url) etc.
+    
+    db.delete(project)
+    db.commit()
+    return {"message": "Project deleted successfully"}
+
+
 @app.get("/portfolios/{subdomain}/projects")
+
 def get_portfolio_projects(subdomain: str, db: Session = Depends(get_db)):
     # This is a PUBLIC route so anyone visiting the creator's portfolio can see their work!
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
@@ -542,8 +606,11 @@ def update_project_story(
 @app.post("/projects/{project_id}/story/upload")
 async def upload_story_media(
     project_id: int,
+
     stage: str = Form(...),         # brief | storyboard | rough_cut | revisions | final
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
+    direct_key: str = Form(None),
+    media_type_override: str = Form(None), # image | video
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -567,22 +634,35 @@ async def upload_story_media(
         db.commit()
         db.refresh(story)
 
-    # Determine media type from MIME
-    content_type = file.content_type or ""
-    if content_type.startswith("image/"):
-        media_type = "image"
-    elif content_type.startswith("video/"):
-        media_type = "video"
-    else:
-        raise HTTPException(status_code=400, detail="Only image or video files are accepted.")
+    # Resolve media type and key
+    s3_key = None
+    media_type = None
 
-    # Upload to S3
-    s3_key = s3_utils.upload_file_to_s3(file.file, file.filename)
+    if direct_key:
+        s3_key = direct_key
+        media_type = media_type_override or "video"
+    elif file:
+        # Determine media type from MIME
+        content_type = file.content_type or ""
+        if content_type.startswith("image/"):
+            media_type = "image"
+        elif content_type.startswith("video/"):
+            media_type = "video"
+        else:
+            raise HTTPException(status_code=400, detail="Only image or video files are accepted.")
+        
+        # Upload using the full S3 URL but we store relative keys in story media
+        file_url = s3_utils.upload_file_to_s3(file.file, file.filename)
+        if not file_url:
+            raise HTTPException(status_code=500, detail="Upload to cloud storage failed.")
+        s3_key = file_url.split(".amazonaws.com/")[-1]
+    
     if not s3_key:
-        raise HTTPException(status_code=500, detail="Upload to cloud storage failed.")
+        raise HTTPException(status_code=400, detail="Either a file or a direct_key must be provided.")
 
     presigned = s3_utils.get_presigned_url(s3_key)
     media_item = {"type": media_type, "url": presigned, "key": s3_key}
+
 
     # Append to the correct stage media list
     media_field = f"{stage}_media"

@@ -68,7 +68,7 @@ export default function LoginPage() {
             muted 
             playsInline 
             className="w-full h-full object-cover filter contrast-125 saturate-50 grayscale select-none pointer-events-none"
-            src="https://www.w3schools.com/html/mov_bbb.mp4" 
+            src="/login.mp4" 
           />
         </div>
 

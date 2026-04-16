@@ -67,7 +67,7 @@ export default function SignupPage() {
             muted 
             playsInline 
             className="w-full h-full object-cover filter contrast-125 hover:grayscale-0 transition-all duration-[3000ms] ease-out grayscale select-none pointer-events-none"
-            src="https://www.w3schools.com/html/mov_bbb.mp4" 
+            src="/signup.mp4" 
           />
         </div>
 
