@@ -24,6 +24,13 @@ export default function PortfolioPlayer({
   const activeUrl = (optimizedUrl && transcodingStatus === 'completed') ? optimizedUrl : url;
   const isProcessing = transcodingStatus === 'processing' || transcodingStatus === 'pending';
 
+  // Debug logging to help identify why overlay might persist
+  useEffect(() => {
+    if (transcodingStatus === 'completed') {
+      console.log(`DEBUG: Project "${title}" optimization complete. Overlay should hide.`);
+    }
+  }, [transcodingStatus, title]);
+
   const isHoveredRef = useRef(false);
 
   const handleMouseEnter = () => {

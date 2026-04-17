@@ -18,8 +18,15 @@ const jbMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FolioHub | Premium Creator Portfolios",
-  description: "Magical next-generation portfolio engine for elite creators.",
+  title: "FolioHub | Elite Media management",
+  description: "The cinematic production hub for directors and editors.",
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -30,10 +37,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${interSans.variable} ${outfitDisplay.variable} ${jbMono.variable} h-full antialiased dark`}
+      className={`${interSans.variable} ${outfitDisplay.variable} ${jbMono.variable} h-full antialiased dark scroll-smooth`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-[#030014] text-zinc-200">
-        <div className="fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+      <body className="min-h-full flex flex-col font-sans bg-[#050505] text-white selection:bg-white selection:text-black overflow-x-hidden">
+        <div className="fixed inset-0 z-[-1] bg-[radial-gradient(circle_at_50%_0%,rgba(20,20,20,1)_0%,rgba(5,5,5,1)_100%)]"></div>
         {children}
       </body>
     </html>

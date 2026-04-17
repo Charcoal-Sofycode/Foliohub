@@ -1,15 +1,24 @@
-from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from auth import get_current_user
 from fastapi import File, UploadFile, Form
 from datetime import datetime, timedelta, timezone
+import secrets
 import random
 
 import s3_utils  # Import your new S3 logic
 import email_utils  # OTP email utility
 import transcoding_utils
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# Limiter initialization
+limiter = Limiter(key_func=get_remote_address)
 
 # Import our files
 import models, schemas, auth
@@ -18,15 +27,35 @@ import os
 import stripe
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 app = FastAPI(title="Portfolio SaaS API")
 
+# ── Security Headers Middleware ────────────────────────────────────────────────
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── CORS ───────────────────────────────────────────────────────────────────────
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 @app.get("/")
@@ -36,7 +65,8 @@ def read_root():
 # --- AUTHENTICATION ROUTES ---
 
 @app.post("/signup", response_model=schemas.UserResponse)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def create_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
     # 1. Check if the email already exists in Supabase
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if db_user:
@@ -54,7 +84,8 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 @app.post("/login", response_model=schemas.Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
@@ -64,9 +95,9 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 2FA CHECK
+    # 2FA CHECK — uses cryptographically-secure random code
     if user.is_2fa_enabled:
-        code = str(random.randint(100000, 999999))
+        code = f"{secrets.randbelow(1000000):06d}"
         user.two_factor_code = code
         db.commit()
         # Dispatch verification email
@@ -97,7 +128,8 @@ def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depend
     return {"message": "2FA strictly enabled."}
 
 @app.post("/forgot-password")
-def forgot_password(data: schemas.ForgotPassword, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def forgot_password(request: Request, data: schemas.ForgotPassword, db: Session = Depends(get_db)):
     """Step 1: Generate a 6-digit OTP and email it to the user."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
 
@@ -494,18 +526,22 @@ from fastapi import Request
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
-    
-    # In production, specify the endpoint secret here
-    # endpoint_secret = 'whsec_...'
-    # event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    
-    try:
-        import json
-        event = stripe.Event.construct_from(
-            json.loads(payload), stripe.api_key
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+
+    # Verify webhook signature if secret is configured (strongly recommended in production)
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        except stripe.error.SignatureVerificationError:
+            raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature.")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    else:
+        # Fallback for local dev without a webhook secret (unsafe for production)
+        try:
+            import json
+            event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']

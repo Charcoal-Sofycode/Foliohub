@@ -1,6 +1,6 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, Field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 # Schema for when a user signs up
 class UserCreate(BaseModel):
@@ -182,9 +182,9 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 class InquiryCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    project_details: str
+    project_details: str = Field(..., min_length=10, max_length=2000)
 
 class InquiryResponse(BaseModel):
     id: int

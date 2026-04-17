@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import FolioLogo from '@/components/FolioLogo';
-import { Search, MapPin, Briefcase } from 'lucide-react';
+import { Search, MapPin } from 'lucide-react';
+import { API_URL } from '@/lib/api';
 
 export default function DirectoryPage() {
   const [portfolios, setPortfolios] = useState<any[]>([]);
@@ -12,7 +13,7 @@ export default function DirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:8000/portfolios')
+    fetch(`${API_URL}/portfolios`)
       .then(res => res.json())
       .then(data => {
         setPortfolios(data);
@@ -33,36 +34,36 @@ export default function DirectoryPage() {
     <main className="min-h-screen bg-[#050505] text-white selection:bg-white selection:text-black">
       
       {/* Avant-Garde Navigation */}
-      <nav className="fixed top-0 inset-x-0 z-50 mix-blend-difference px-8 lg:px-12 py-8 flex justify-between items-center pointer-events-none">
+      <nav className="fixed top-0 inset-x-0 z-50 mix-blend-difference px-4 sm:px-8 lg:px-12 py-6 sm:py-8 flex justify-between items-center pointer-events-none">
         <div className="pointer-events-auto">
-           <FolioLogo iconSize={24} className="text-xl" />
+           <FolioLogo iconSize={20} className="sm:text-xl" />
         </div>
-        <div className="flex gap-8 pointer-events-auto items-center">
-          <Link href="/login" className="text-sm uppercase tracking-[0.2em] hover:opacity-50 transition-opacity">Login</Link>
-          <Link href="/dashboard" className="text-sm uppercase tracking-[0.2em] hover:opacity-50 transition-opacity">Dashboard</Link>
+        <div className="flex gap-4 sm:gap-8 pointer-events-auto items-center">
+          <Link href="/login" className="text-[10px] sm:text-sm uppercase tracking-[0.2em] hover:opacity-50 transition-opacity">Login</Link>
+          <Link href="/dashboard" className="text-[10px] sm:text-sm uppercase tracking-[0.2em] hover:opacity-50 transition-opacity">Dashboard</Link>
         </div>
       </nav>
 
-      <section className="pt-40 px-8 lg:px-24">
-         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mb-20">
-            <h1 className="text-6xl lg:text-8xl font-black tracking-tighter uppercase leading-[0.85] mb-8">
+      <section className="pt-32 sm:pt-40 px-4 sm:px-8 lg:px-24">
+         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mb-12 sm:mb-20">
+            <h1 className="text-5xl sm:text-6xl lg:text-8xl font-black tracking-tighter uppercase leading-[0.85] mb-6 sm:mb-8">
                Discover <br/>
                <span className="text-zinc-500 font-serif italic font-light">Creators.</span>
             </h1>
-            <p className="text-xl text-zinc-400 font-light max-w-2xl">
+            <p className="text-lg sm:text-xl text-zinc-400 font-light max-w-2xl">
                The global directory of elite video editors, colorists, and motion designers. Browse portfolios and hire directly.
             </p>
          </motion.div>
 
          {/* Search Filter */}
-         <div className="relative max-w-2xl mb-16">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+         <div className="relative max-w-2xl mb-12 sm:mb-16">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-zinc-500" />
             <input 
               type="text" 
-              placeholder="Search by skill (e.g. Color Grading) or name..." 
+              placeholder="Search by skill or name..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-full py-5 pl-16 pr-8 text-white outline-none focus:border-white transition-colors"
+              className="w-full bg-zinc-900/50 border border-zinc-800 rounded-full py-4 sm:py-5 pl-14 sm:pl-16 pr-8 text-sm sm:text-base text-white outline-none focus:border-white transition-colors"
             />
          </div>
 

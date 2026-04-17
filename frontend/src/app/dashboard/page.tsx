@@ -123,32 +123,41 @@ function DashboardContent() {
     };
 
     initializeDashboard();
+  }, [sessionId]);
 
-    // SMART POLLING: Only ping if active work is actually happening
+  // REACTIVE POLLING: Automatically starts when any project is pending/processing
+  useEffect(() => {
+    if (!portfolio?.projects) return;
+
+    const needsPolling = portfolio.projects.some((p: any) => 
+      p.transcoding_status === 'pending' || p.transcoding_status === 'processing'
+    );
+
+    if (!needsPolling) return;
+
+    console.log("DEBUG: Processing detected. Starting background sync...");
+    
     const pollInterval = setInterval(async () => {
-       // We fetch the LATEST data to see if we still need to poll
-       try {
-         const res = await api.get('/portfolios/me');
-         const projects = res.data.projects || [];
-         
-         const isStillProcessing = projects.some((p: any) => 
-           p.transcoding_status === 'pending' || p.transcoding_status === 'processing'
-         );
+      try {
+        const res = await api.get('/portfolios/me');
+        // Check if we still need to poll based on the NEW data
+        const stillWorking = res.data.projects?.some((p: any) => 
+          p.transcoding_status === 'pending' || p.transcoding_status === 'processing'
+        );
 
-         // Sync the local state
-         setPortfolio(res.data);
-         
-         if (!isStillProcessing) {
-           console.log("DEBUG: All assets live. Polling terminated.");
-           clearInterval(pollInterval);
-         }
-       } catch (e) {
-         console.error("Polling Sync Error", e);
-       }
+        setPortfolio(res.data);
+
+        if (!stillWorking) {
+          console.log("DEBUG: All assets finalized. Polling terminated.");
+          clearInterval(pollInterval);
+        }
+      } catch (e) {
+        console.error("Polling Sync Error", e);
+      }
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [sessionId, portfolio?.projects?.length]); // Re-run if list changes
+  }, [portfolio?.projects]); // Dependency on projects array allows detecting new uploads and status changes
 
 
   const fetchPortfolio = async () => {
@@ -509,10 +518,10 @@ function DashboardContent() {
         </div>
       ) : (
         // --- ACTIVE DASHBOARD MODE ---
-        <div className="flex h-screen overflow-hidden bg-[#050505]">
+        <div className="flex h-screen overflow-hidden bg-[#050505] flex-col md:flex-row">
           
           {/* SIDEBAR */}
-          <aside className="w-72 border-r border-zinc-900 bg-[#050505] flex flex-col justify-between hidden md:flex shrink-0">
+          <aside className="w-72 border-r border-zinc-900 bg-[#050505] flex-col justify-between hidden md:flex shrink-0">
             <div>
               <div className="p-8 border-b border-zinc-900">
                 <FolioLogo iconSize={24} />
@@ -572,8 +581,32 @@ function DashboardContent() {
             </div>
           </aside>
 
+          {/* MOBILE BOTTOM NAV */}
+          <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-[#050505] border-t border-zinc-900 flex items-center justify-around px-2 py-2 safe-area-inset-bottom">
+            {[
+              { id: 'projects', icon: <Grid className="w-5 h-5" />, label: 'Assets' },
+              { id: 'analytics', icon: <BarChart className="w-5 h-5" />, label: 'Stats' },
+              { id: 'inquiries', icon: <Mail className="w-5 h-5" />, label: 'Leads' },
+              { id: 'settings', icon: <Settings className="w-5 h-5" />, label: 'Config' },
+              { id: 'billing', icon: <Zap className="w-5 h-5" />, label: 'Plan' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition min-w-0 flex-1 ${
+                  activeTab === tab.id
+                    ? 'text-white bg-zinc-900'
+                    : 'text-zinc-500 hover:text-white'
+                }`}
+              >
+                {tab.icon}
+                <span className="text-[9px] uppercase tracking-widest font-medium">{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+
           {/* MAIN CONTENT AREA */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-12 relative scroll-smooth bg-[#0a0a0a]">
+          <main className="flex-1 overflow-y-auto p-4 md:p-12 relative scroll-smooth bg-[#0a0a0a] pb-24 md:pb-12">
             <div className="max-w-6xl mx-auto pb-24">
               
               <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12 border-b border-zinc-900 pb-8">
@@ -1098,11 +1131,11 @@ function DashboardContent() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Category</label>
                     <select 
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors text-white font-light"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white font-light"
                       value={uploadCategory}
                       onChange={(e) => setUploadCategory(e.target.value)}
                       disabled={isUploading}
@@ -1118,18 +1151,18 @@ function DashboardContent() {
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Your Role</label>
                     <input 
                       type="text" 
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors text-white placeholder-zinc-800 font-light"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white placeholder-zinc-800 font-light"
                       value={uploadRole}
                       onChange={(e) => setUploadRole(e.target.value)}
                       disabled={isUploading}
                       placeholder="e.g. Lead Editor, Colorist"
                     />
                   </div>
-                  <div className="space-y-1 col-span-2">
+                  <div className="space-y-1 col-span-1 sm:col-span-2">
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Tools Used</label>
                     <input 
                       type="text" 
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors text-white placeholder-zinc-800 font-light"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white placeholder-zinc-800 font-light"
                       value={uploadTools}
                       onChange={(e) => setUploadTools(e.target.value)}
                       disabled={isUploading}
@@ -1175,7 +1208,7 @@ function DashboardContent() {
                 </div>
 
                 {!editingProject && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Final Edit Video</label>
                       <div className="relative group mt-2">

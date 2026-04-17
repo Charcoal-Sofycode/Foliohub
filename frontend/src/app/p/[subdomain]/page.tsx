@@ -4,9 +4,10 @@ import { useEffect, useState, use } from 'react';
 import { motion } from 'framer-motion';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
-import { MapPin, CalendarClock, Briefcase, ExternalLink, Sparkles, Send, Play, Camera, CheckCircle2, Download } from 'lucide-react';
+import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download } from 'lucide-react';
 import FolioLogo from '@/components/FolioLogo';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
+import { API_URL } from '@/lib/api';
 
 export default function PortfolioView({ params }: { params: Promise<{ subdomain: string }> }) {
   const resolvedParams = use(params);
@@ -15,7 +16,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
   const [activeCategory, setActiveCategory] = useState('All');
 
   useEffect(() => {
-    fetch(`http://localhost:8000/portfolios/view/${resolvedParams.subdomain}`)
+    fetch(`${API_URL}/portfolios/view/${resolvedParams.subdomain}`)
       .then(res => res.json())
       .then(data => {
         setPortfolio(data);
@@ -28,11 +29,20 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
   }, [resolvedParams.subdomain]);
 
   if (isLoading) {
-    return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono opacity-50 uppercase tracking-[0.3em] text-xs">Loading Studio...</div>;
+    return (
+      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center gap-4">
+        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+        <p className="font-mono opacity-50 uppercase tracking-[0.3em] text-xs">Loading Studio...</p>
+      </div>
+    );
   }
 
   if (!portfolio || !portfolio.id) {
-    return <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono uppercase tracking-[0.3em] text-xs">Studio Not Found</div>;
+    return (
+      <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center font-mono uppercase tracking-[0.3em] text-xs">
+        Studio Not Found
+      </div>
+    );
   }
 
   const projects = portfolio.projects || [];
@@ -48,26 +58,26 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
     <main className="min-h-screen bg-[#050505] text-white font-sans selection:bg-white selection:text-black pb-32">
       
       {/* Navigation */}
-      <nav className="fixed top-0 inset-x-0 z-50 mix-blend-difference px-6 lg:px-12 py-8 flex justify-between items-center pointer-events-none">
-         <div className="pointer-events-auto flex items-center gap-4">
+      <nav className="fixed top-0 inset-x-0 z-50 mix-blend-difference px-4 sm:px-6 lg:px-12 py-5 sm:py-8 flex justify-between items-center pointer-events-none">
+         <div className="pointer-events-auto flex items-center gap-2 sm:gap-4 min-w-0">
            <FolioLogo iconSize={20} />
-           <div className="w-px h-4 bg-white/20" />
-           <h1 className="text-lg font-bold tracking-tighter uppercase">{portfolio.title}</h1>
+           <div className="w-px h-4 bg-white/20 hidden sm:block" />
+           <h1 className="text-sm sm:text-lg font-bold tracking-tighter uppercase truncate max-w-[140px] sm:max-w-none hidden sm:block">{portfolio.title}</h1>
          </div>
-         <div className="flex items-center gap-6 pointer-events-auto">
+         <div className="flex items-center gap-2 sm:gap-6 pointer-events-auto">
             {portfolio.booking_link && (
-               <a href={portfolio.booking_link} target="_blank" className="px-6 py-2 border border-white text-[10px] uppercase font-bold tracking-[0.2em] hover:bg-white hover:text-black transition">
+               <a href={portfolio.booking_link} target="_blank" rel="noopener noreferrer" className="hidden sm:inline-flex px-4 sm:px-6 py-2 border border-white text-[10px] uppercase font-bold tracking-[0.2em] hover:bg-white hover:text-black transition">
                  Book Now
                </a>
             )}
-            <a href="#contact" className="px-6 py-2 bg-white text-black text-[10px] uppercase font-bold tracking-[0.2em] hover:bg-zinc-300 transition">
+            <a href="#contact" className="px-4 sm:px-6 py-2 bg-white text-black text-[10px] uppercase font-bold tracking-[0.2em] hover:bg-zinc-300 transition">
               Hire Me
             </a>
          </div>
       </nav>
 
       {/* Hero / Showreel */}
-      <header className="h-[90vh] relative pt-32 px-6 lg:px-12 flex flex-col justify-end pb-12">
+      <header className="h-[90vh] relative pt-24 sm:pt-32 px-4 sm:px-6 lg:px-12 flex flex-col justify-end pb-8 sm:pb-12">
          {portfolio.showreel_url ? (
             <div className="absolute inset-0 z-0">
                {/* Embed youtube or video. If it's a raw video url: */}
@@ -86,25 +96,25 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             <motion.h2 
               initial={{ opacity: 0, y: 20 }} 
               animate={{ opacity: 1, y: 0 }} 
-              className="text-6xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85] mb-6"
+              className="text-4xl sm:text-6xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85] mb-4 sm:mb-6"
             >
               {portfolio.title}
             </motion.h2>
             {portfolio.bio && (
                <motion.p 
                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-                 className="text-lg md:text-2xl text-zinc-400 font-light max-w-2xl leading-relaxed"
+                 className="text-base sm:text-lg md:text-2xl text-zinc-400 font-light max-w-2xl leading-relaxed"
                >
                  {portfolio.bio}
                </motion.p>
             )}
 
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-wrap gap-6 mt-8 border-t border-white/20 pt-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="flex flex-wrap gap-4 sm:gap-6 mt-6 sm:mt-8 border-t border-white/20 pt-4 sm:pt-6">
                {portfolio.location && (
-                 <div className="flex items-center gap-2 text-zinc-400 text-sm font-mono uppercase tracking-widest"><MapPin className="w-4 h-4"/> {portfolio.location}</div>
+                 <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm font-mono uppercase tracking-widest"><MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> {portfolio.location}</div>
                )}
                {portfolio.availability && (
-                 <div className="flex items-center gap-2 text-zinc-400 text-sm font-mono uppercase tracking-widest"><CalendarClock className="w-4 h-4"/> {portfolio.availability}</div>
+                 <div className="flex items-center gap-2 text-zinc-400 text-xs sm:text-sm font-mono uppercase tracking-widest"><CalendarClock className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> {portfolio.availability}</div>
                )}
             </motion.div>
          </div>
@@ -175,16 +185,16 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
       )}
 
       {/* Projects Gallery */}
-      <section className="px-6 lg:px-12 py-24">
-         <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
-            <h3 className="text-4xl md:text-6xl font-black uppercase tracking-tighter">Selected <br/><span className="text-zinc-500 italic font-serif font-light">Works.</span></h3>
+      <section className="px-4 sm:px-6 lg:px-12 py-16 sm:py-24">
+         <div className="flex flex-col md:flex-row justify-between items-end mb-12 sm:mb-16 gap-6 sm:gap-8">
+            <h3 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter">Selected <br/><span className="text-zinc-500 italic font-serif font-light">Works.</span></h3>
             
-            <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            <div className="flex gap-3 overflow-x-auto pb-2 sm:pb-4">
                {categories.map((cat: any) => (
                   <button 
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-6 py-2 text-xs font-mono uppercase tracking-widest whitespace-nowrap transition-colors ${activeCategory === cat ? 'bg-white text-black' : 'border border-zinc-800 text-zinc-500 hover:text-white'}`}
+                    className={`px-4 sm:px-6 py-2 text-xs font-mono uppercase tracking-widest whitespace-nowrap transition-colors ${activeCategory === cat ? 'bg-white text-black' : 'border border-zinc-800 text-zinc-500 hover:text-white'}`}
                   >
                     {cat}
                   </button>
@@ -304,7 +314,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
 
 
       {/* Inquiry / Contact Section */}
-      <section id="contact" className="px-6 lg:px-12 py-40 border-t border-zinc-900 bg-gradient-to-b from-[#050505] to-[#0a0a0a]">
+      <section id="contact" className="px-4 sm:px-6 lg:px-12 py-24 sm:py-40 border-t border-zinc-900 bg-gradient-to-b from-[#050505] to-[#0a0a0a]">
          <div className="max-w-4xl mx-auto flex flex-col md:flex-row gap-20">
             <div className="flex-1">
                <h3 className="text-5xl font-black uppercase tracking-tighter mb-6">Start a <br/>Project.</h3>
