@@ -242,6 +242,53 @@ def delete_user_account(data: schemas.UserDelete, db: Session = Depends(get_db),
 
     return {"message": "Account and all associated assets have been permanently deleted from the grid."}
 
+@app.get("/users/me/export")
+def export_user_data(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """GDPR Right to Portability: Export all user data in JSON format."""
+    portfolio = current_user.portfolio
+    
+    export_data = {
+        "user_profile": {
+            "email": current_user.email,
+            "subscription_tier": current_user.subscription_tier,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        },
+        "portfolio": None,
+        "exported_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    if portfolio:
+        export_data["portfolio"] = {
+            "title": portfolio.title,
+            "subdomain": portfolio.subdomain,
+            "bio": portfolio.bio,
+            "location": portfolio.location,
+            "skills": portfolio.skills,
+            "theme": portfolio.theme_preference,
+            "projects": [
+                {
+                    "title": p.title,
+                    "description": p.description,
+                    "category": p.category,
+                    "role": p.role,
+                    "tools": p.tools_used,
+                    "views": p.view_count,
+                    "media_url": p.media_url,
+                    "created_at": p.created_at.isoformat() if p.created_at else None
+                } for p in portfolio.projects
+            ],
+            "leads": [
+                {
+                    "from_name": i.name,
+                    "from_email": i.email,
+                    "details": i.project_details,
+                    "date": i.created_at.isoformat() if i.created_at else None
+                } for i in portfolio.inquiries
+            ]
+        }
+    
+    return export_data
+
 @app.post("/enable-2fa")
 def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     current_user.is_2fa_enabled = True

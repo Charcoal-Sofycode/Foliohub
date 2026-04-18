@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAgreed, setIsAgreed] = useState(false);
   const router = useRouter();
 
   // STEP 1: Request OTP
@@ -40,6 +41,10 @@ export default function SignupPage() {
     e.preventDefault();
     if (password !== confirmPassword) {
       setError("Passwords do not match");
+      return;
+    }
+    if (!isAgreed) {
+      setError("You must acknowledge the Privacy Policy to proceed.");
       return;
     }
     
@@ -196,6 +201,20 @@ export default function SignupPage() {
                       placeholder="••••••••"
                     />
                   </div>
+                </div>
+
+                <div className="flex items-start gap-3 pt-4">
+                   <div className="relative flex items-center h-5">
+                      <input 
+                        type="checkbox" 
+                        checked={isAgreed}
+                        onChange={(e) => setIsAgreed(e.target.checked)}
+                        className="w-4 h-4 rounded border-zinc-800 bg-black text-white focus:ring-0 focus:ring-offset-0 transition cursor-pointer" 
+                      />
+                   </div>
+                   <label className="text-[10px] text-zinc-500 font-light leading-relaxed">
+                      I acknowledge the <span className="text-white hover:underline cursor-pointer">Privacy Policy</span> and agree that my uploaded media will be processed via secure AWS S3 environments.
+                   </label>
                 </div>
               </>
             )}

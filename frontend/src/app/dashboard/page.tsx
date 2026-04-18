@@ -412,6 +412,25 @@ function DashboardContent() {
     }
   };
 
+  const handleExportData = async () => {
+    setManagementLoading(true);
+    try {
+      const res = await api.get('/users/me/export');
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `foliohub_export_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      setManagementSuccess('Archive generated and download initiated.');
+    } catch (err) {
+      setManagementError('Failed to compile data archive.');
+    } finally {
+      setManagementLoading(false);
+    }
+  };
+
   const openEditModal = (project: any) => {
     setEditingProject(project);
     setUploadTitle(project.title);
@@ -1049,6 +1068,23 @@ function DashboardContent() {
                                    <p className="text-sm text-zinc-500 mb-6">Permanently wipe your account, media, and digital footprint from the platform.</p>
                                 </div>
                                 <button onClick={() => setShowDeleteAccountModal(true)} className="w-full py-3 bg-red-600 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-red-700 transition">Commence Wipe</button>
+                             </div>
+                          </div>
+
+                          {/* GDPR Privacy Section */}
+                          <div className="bg-[#050505] border border-zinc-900 p-8 rounded-xl">
+                             <div className="flex items-start justify-between">
+                                <div>
+                                   <h4 className="font-bold text-white mb-1 flex items-center gap-2"><Shield className="w-4 h-4 text-zinc-500" /> Privacy & Data Portability</h4>
+                                   <p className="text-sm text-zinc-500 max-w-lg leading-relaxed">In accordance with GDPR, you have the right to access and port your data. You can download a structured digital archive of your entire studio history.</p>
+                                </div>
+                                <button 
+                                  onClick={handleExportData}
+                                  disabled={managementLoading}
+                                  className="px-6 py-3 border border-white text-white text-[10px] uppercase font-bold tracking-widest hover:bg-white hover:text-black transition flex items-center gap-2"
+                                >
+                                   <DownloadCloud className="w-4 h-4" /> Download archive
+                                </button>
                              </div>
                           </div>
                        </div>
