@@ -29,6 +29,10 @@ import stripe
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
+# ── Dynamic Schema Sync ───────────────────────────────────────────────────────
+# This ensures that any new models (like SignupOTP) are created automatically
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="Portfolio SaaS API")
 
 @app.get("/health")
