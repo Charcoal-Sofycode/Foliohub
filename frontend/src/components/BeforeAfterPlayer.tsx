@@ -101,9 +101,13 @@ export default function BeforeAfterPlayer({
       rawVideoRef.current.muted = true;
       finalVideoRef.current.muted = true;
     } else {
-      // Linear crossfade: as you reveal Post-Production, Raw audio fades out
-      const rawVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
-      const finalVol = Math.max(0, Math.min(1, sliderPosition / 100));
+      // CORRECTED: As sliderPosition increases (moving right), we reveal MORE of the RAW video
+      // because the Final layer is inset from the left.
+      // sliderPosition 0 = Final Edit (Full)
+      // sliderPosition 100 = Raw Footage (Full)
+      
+      const rawVol = Math.max(0, Math.min(1, sliderPosition / 100));
+      const finalVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
       
       rawVideoRef.current.muted = false;
       finalVideoRef.current.muted = false;

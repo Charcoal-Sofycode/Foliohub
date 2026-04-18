@@ -1413,9 +1413,9 @@ function DashboardContent() {
                         <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
                           {selectedFile ? (
                             <>
-                              <CheckCircle2 className="w-6 h-6 text-white mb-2" />
-                              <p className="text-sm font-medium text-white max-w-sm shrink-0 truncate">{selectedFile.name}</p>
-                              <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                              <CheckCircle2 className="w-5 h-5 text-white mb-2" />
+                              <p className="text-[11px] font-bold text-white max-w-[140px] truncate">{selectedFile.name}</p>
+                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
                             </>
                           ) : (
                             <>
@@ -1441,9 +1441,9 @@ function DashboardContent() {
                         <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${uploadRawFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
                           {uploadRawFile ? (
                             <>
-                              <CheckCircle2 className="w-6 h-6 text-white mb-2" />
-                              <p className="text-sm font-medium text-white max-w-sm shrink-0 truncate">{uploadRawFile.name}</p>
-                              <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                              <CheckCircle2 className="w-5 h-5 text-white mb-2" />
+                              <p className="text-[11px] font-bold text-white max-w-[140px] truncate">{uploadRawFile.name}</p>
+                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
                             </>
                           ) : (
                             <>
