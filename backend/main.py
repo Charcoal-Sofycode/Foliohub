@@ -485,6 +485,16 @@ def get_my_portfolio(db: Session = Depends(get_db), current_user: models.User = 
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
+    
+    # SECURITY: Generate temporary signatures for all studio assets
+    for project in portfolio.projects:
+        if project.media_url:
+            project.media_url = s3_utils.get_presigned_url(project.media_url)
+        if project.raw_media_url:
+            project.raw_media_url = s3_utils.get_presigned_url(project.raw_media_url)
+        if project.optimized_url:
+            project.optimized_url = s3_utils.get_presigned_url(project.optimized_url)
+            
     return portfolio
     
 @app.put("/portfolios/me", response_model=schemas.PortfolioResponse)
@@ -681,20 +691,40 @@ def delete_project(
 
 
 @app.get("/portfolios/{subdomain}/projects")
-
 def get_portfolio_projects(subdomain: str, db: Session = Depends(get_db)):
     # This is a PUBLIC route so anyone visiting the creator's portfolio can see their work!
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
+    
+    # SECURITY: Generate temporary signatures for public playback
+    signed_projects = []
+    for project in portfolio.projects:
+        if project.media_url:
+            project.media_url = s3_utils.get_presigned_url(project.media_url)
+        if project.raw_media_url:
+            project.raw_media_url = s3_utils.get_presigned_url(project.raw_media_url)
+        if project.optimized_url:
+            project.optimized_url = s3_utils.get_presigned_url(project.optimized_url)
+        signed_projects.append(project)
         
-    return portfolio.projects
+    return signed_projects
     
 @app.get("/portfolios/view/{subdomain}", response_model=schemas.PortfolioResponse)
 def get_public_portfolio(subdomain: str, db: Session = Depends(get_db)):
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+    # SECURITY: Generate temporary signatures for all assets in the public view
+    for project in portfolio.projects:
+        if project.media_url:
+            project.media_url = s3_utils.get_presigned_url(project.media_url)
+        if project.raw_media_url:
+            project.raw_media_url = s3_utils.get_presigned_url(project.raw_media_url)
+        if project.optimized_url:
+            project.optimized_url = s3_utils.get_presigned_url(project.optimized_url)
+            
     return portfolio
 
 @app.post("/ai/match", response_model=list[schemas.MatchResult])
