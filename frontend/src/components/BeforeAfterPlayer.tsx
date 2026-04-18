@@ -98,8 +98,8 @@ export default function BeforeAfterPlayer({
       rawVideoRef.current.muted = true;
       finalVideoRef.current.muted = true;
     } else {
-      const rawVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
-      const finalVol = Math.max(0, Math.min(1, sliderPosition / 100));
+      const rawVol = Math.max(0, Math.min(1, sliderPosition / 100));
+      const finalVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
       
       rawVideoRef.current.muted = false;
       finalVideoRef.current.muted = false;
