@@ -189,7 +189,10 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                {/* Password strength hint */}
+                <PasswordStrength password={password} />
+
+                <div className="space-y-1 pt-2">
                   <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Confirm Key</label>
                   <div className="relative">
                     <input 
@@ -259,5 +262,27 @@ export default function SignupPage() {
         </motion.div>
       </div>
     </main>
+  );
+}
+
+/* ─── Sub-components ─────────────────────────────────────────────────────── */
+function PasswordStrength({ password }: { password: string }) {
+  const checks = [
+    { label: 'At least 8 chars',      pass: password.length >= 8 },
+    { label: 'Uppercase letter',       pass: /[A-Z]/.test(password) },
+    { label: 'Number or symbol',       pass: /[0-9!@#$%^&*]/.test(password) },
+  ];
+  if (!password) return null;
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-2 py-2">
+      {checks.map(c => (
+        <div key={c.label}
+             className={`flex items-center gap-1.5 text-[10px] font-medium transition-colors
+                         ${c.pass ? 'text-emerald-500' : 'text-zinc-700'}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${c.pass ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
+          {c.label}
+        </div>
+      ))}
+    </div>
   );
 }

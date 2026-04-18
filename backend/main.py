@@ -8,6 +8,7 @@ from fastapi import File, UploadFile, Form
 from datetime import datetime, timedelta, timezone
 import secrets
 import random
+import re
 
 import s3_utils  # Import your new S3 logic
 import email_utils  # OTP email utility
@@ -91,6 +92,16 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
 def read_root():
     return {"message": "Welcome to the Portfolio SaaS API. The engine is running."}
 
+# --- UTILITIES ---
+def validate_password_strength(password: str):
+    """Enforce industry-standard password complexity."""
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Security key must be at least 8 characters long.")
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(status_code=400, detail="Security key must contain at least one uppercase letter.")
+    if not re.search(r"[0-9!@#$%^&*]", password):
+        raise HTTPException(status_code=400, detail="Security key must contain at least one number or special character.")
+
 # --- AUTHENTICATION ROUTES ---
 
 @app.post("/signup/request-otp")
@@ -143,7 +154,10 @@ def create_user(request: Request, user_data: schemas.UserCreateVerified, db: Ses
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # 3. Hash and Save
+    # 3. Security Level Check
+    validate_password_strength(user_data.password)
+
+    # 4. Hash and Save
     hashed_password = auth.get_password_hash(user_data.password)
     new_user = models.User(email=user_data.email, hashed_password=hashed_password)
     db.add(new_user)
@@ -213,6 +227,7 @@ def update_user_password(data: schemas.UserUpdatePassword, db: Session = Depends
         raise HTTPException(status_code=401, detail="Current password verification failed.")
     
     # Update to new password
+    validate_password_strength(data.new_password)
     current_user.hashed_password = auth.get_password_hash(data.new_password)
     db.commit()
     return {"message": "Security key successfully rotated."}
@@ -385,6 +400,7 @@ def reset_password_otp(data: schemas.ResetPasswordOTP, db: Session = Depends(get
             raise HTTPException(status_code=400, detail="Recovery code has expired. Please request a new one.")
 
     # All checks passed — update password and clear OTP
+    validate_password_strength(data.new_password)
     user.hashed_password = auth.get_password_hash(data.new_password)
     user.reset_otp = None
     user.reset_otp_expires_at = None

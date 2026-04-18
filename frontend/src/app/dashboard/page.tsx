@@ -52,6 +52,25 @@ export default function DashboardPage() {
   );
 }
 
+function PasswordStrength({ password }: { password: string }) {
+  const checks = [
+    { label: 'At least 8 chars',      pass: (password || '').length >= 8 },
+    { label: 'Uppercase letter',       pass: /[A-Z]/.test(password || '') },
+    { label: 'Number or symbol',       pass: /[0-9!@#$%^&*]/.test(password || '') },
+  ];
+  if (!password) return null;
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-2 py-2 text-[10px]">
+      {checks.map(c => (
+        <div key={c.label} className={`flex items-center gap-1.5 ${c.pass ? 'text-emerald-500' : 'text-zinc-700'}`}>
+          <div className={`w-1 h-1 rounded-full ${c.pass ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
+          {c.label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DashboardContent() {
   const [portfolio, setPortfolio] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,6 +111,7 @@ function DashboardContent() {
   const [managementError, setManagementError] = useState('');
   const [managementSuccess, setManagementSuccess] = useState('');
   const [managementLoading, setManagementLoading] = useState(false);
+  const [rotationNewPassword, setRotationNewPassword] = useState('');
 
   // Leads/Inquiries State
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -1516,9 +1536,20 @@ function DashboardContent() {
                    </div>
                    <div className="space-y-1">
                       <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">New Strategic Key</label>
-                      <input name="newPassword" type="password" required className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" />
+                      <input 
+                        name="newPassword" 
+                        type="password" 
+                        required 
+                        value={rotationNewPassword}
+                        onChange={(e) => setRotationNewPassword(e.target.value)}
+                        className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" 
+                      />
                    </div>
-                   <div className="space-y-1">
+                   
+                   {/* Strength Guard */}
+                   <PasswordStrength password={rotationNewPassword} />
+
+                   <div className="space-y-1 pt-2">
                       <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Confirm New Key</label>
                       <input name="confirmPass" type="password" required className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" />
                    </div>
