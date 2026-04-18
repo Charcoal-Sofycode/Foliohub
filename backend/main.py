@@ -35,6 +35,18 @@ app = FastAPI(title="Portfolio SaaS API")
 def health_check():
     return {"status": "awake"}
 
+# ── CORS ───────────────────────────────────────────────────────────────────────
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)
+
 # ── Security Headers Middleware ────────────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -48,19 +60,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ── CORS ───────────────────────────────────────────────────────────────────────
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
-)
+from fastapi.responses import JSONResponse
+@app.exception_handler(RateLimitExceeded)
+async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    response = JSONResponse(
+        status_code=429,
+        content={"detail": "Studio rate limit exceeded. Please wait a moment before trying again."},
+    )
+    origin = request.headers.get("origin")
+    if origin in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 @app.get("/")
 def read_root():
