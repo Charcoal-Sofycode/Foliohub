@@ -68,6 +68,7 @@ export default function PortfolioPlayer({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={() => setIsFullscreen(true)}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <video
           ref={videoRef}
@@ -186,13 +187,10 @@ export default function PortfolioPlayer({
                     <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">We are preparing a web-optimized stream for this masterwork.</p>
                   </div>
                 ) : (
-                  <div className="relative w-full h-full group bg-black">
-                    {/* SECURITY SHIELD: An invisible overlay that prevents right-clicking directly on the video */}
-                    <div 
-                      className="absolute inset-0 z-20" 
-                      onContextMenu={(e) => e.preventDefault()}
-                    />
-
+                  <div 
+                    className="relative w-full h-full group bg-black"
+                    onContextMenu={(e) => e.preventDefault()}
+                  >
                     <video
                       src={selectedQuality === '4K Lossless' ? url : (optimizedUrl || url)}
                       className="w-full h-full object-contain"
@@ -201,7 +199,6 @@ export default function PortfolioPlayer({
                       controlsList="nodownload noplaybackrate"
                       disablePictureInPicture
                       playsInline
-                      onContextMenu={(e) => e.preventDefault()}
                     />
                   </div>
                 )}

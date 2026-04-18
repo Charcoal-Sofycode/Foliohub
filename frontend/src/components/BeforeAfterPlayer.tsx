@@ -180,7 +180,7 @@ export default function BeforeAfterPlayer({
   const PlayerContent = (
     <div 
       ref={containerRef}
-      className={`relative w-full h-full bg-[#030303] overflow-hidden select-none group ${className} ${expanded ? 'rounded-none' : 'rounded-xl cursor-zoom-in border border-white/5'}`}
+      className={`relative w-full h-full bg-[#030303] overflow-hidden select-none group touch-none ${className} ${expanded ? 'rounded-none' : 'rounded-xl cursor-zoom-in border border-white/5'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={!expanded ? openFullscreen : undefined}
@@ -288,7 +288,7 @@ export default function BeforeAfterPlayer({
 
       {/* Interactive Slider Bar */}
       <div 
-        className="absolute inset-y-0 z-50 w-1 bg-white cursor-ew-resize group/slider flex items-center justify-center"
+        className="absolute inset-y-0 z-50 w-1 bg-white cursor-ew-resize group/slider flex items-center justify-center touch-none"
         style={{ left: `${sliderPosition}%` }}
         onPointerDown={onPointerDown}
       >
