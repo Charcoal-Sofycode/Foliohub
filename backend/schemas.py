@@ -75,6 +75,25 @@ class StoryMediaItem(BaseModel):
     url: str       # presigned URL or public URL
     key: str       # S3 key for deletion
 
+    @field_validator("url", mode="after")
+    @classmethod
+    def presign_url(cls, v):
+        import s3_utils
+        if v and not v.startswith("http"):
+             # For legacy safety, but usually it's a key
+             return s3_utils.get_presigned_url(v)
+        elif v and "s3.amazonaws.com" in v:
+             # If it's already a full raw URL, we need to sign the key part
+             try:
+                 key = v.split(".com/")[-1].split("?")[0]
+                 return s3_utils.get_presigned_url(key)
+             except:
+                 return v
+        elif v:
+             # If it's just the key (new standard)
+             return s3_utils.get_presigned_url(v)
+        return v
+
 class RevisionEntry(BaseModel):
     """A single revision round."""
     round: int
@@ -85,15 +104,15 @@ class ProjectStoryResponse(BaseModel):
     id: int
     project_id: int
     brief_note:       Optional[str] = None
-    brief_media:      list[dict] = []
+    brief_media:      list[StoryMediaItem] = []
     storyboard_note:  Optional[str] = None
-    storyboard_media: list[dict] = []
+    storyboard_media: list[StoryMediaItem] = []
     rough_cut_note:   Optional[str] = None
-    rough_cut_media:  list[dict] = []
+    rough_cut_media:  list[StoryMediaItem] = []
     revisions_note:   Optional[str] = None
     revisions_data:   list[dict] = []
     final_note:       Optional[str] = None
-    final_media:      list[dict] = []
+    final_media:      list[StoryMediaItem] = []
     updated_at:       Optional[datetime] = None
 
     class Config:

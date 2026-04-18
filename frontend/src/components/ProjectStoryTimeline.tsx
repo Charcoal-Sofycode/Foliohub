@@ -51,35 +51,35 @@ const STAGES: {
     key: 'brief',
     label: 'Brief',
     icon: <FileText className="w-4 h-4" />,
-    color: 'from-violet-500/20 to-violet-500/0',
+    color: 'from-violet-500/10 to-transparent',
     description: 'Client brief, creative direction & scope.',
   },
   {
     key: 'storyboard',
     label: 'Storyboard',
     icon: <Layout className="w-4 h-4" />,
-    color: 'from-blue-500/20 to-blue-500/0',
+    color: 'from-blue-500/10 to-transparent',
     description: 'Shot list, mood board & visual references.',
   },
   {
     key: 'rough_cut',
     label: 'Rough Cut',
     icon: <Scissors className="w-4 h-4" />,
-    color: 'from-amber-500/20 to-amber-500/0',
+    color: 'from-amber-500/10 to-transparent',
     description: 'First assembly cut & pacing review.',
   },
   {
     key: 'revisions',
-    label: 'Revision Rounds',
+    label: 'Revisions',
     icon: <RefreshCw className="w-4 h-4" />,
-    color: 'from-orange-500/20 to-orange-500/0',
+    color: 'from-orange-500/10 to-transparent',
     description: 'Client feedback & iterative revision notes.',
   },
   {
     key: 'final',
     label: 'Final Export',
     icon: <CheckCircle2 className="w-4 h-4" />,
-    color: 'from-emerald-500/20 to-emerald-500/0',
+    color: 'from-emerald-500/10 to-transparent',
     description: 'Approved deliverables & export specs.',
   },
 ];
@@ -128,14 +128,19 @@ function MediaGrid({
           {item.type === 'image' ? (
             <img
               src={item.url}
-              alt="Story asset"
-              className="w-full h-full object-cover"
+              alt=""
+              className="w-full h-full object-contain bg-black/40"
+              onError={(e) => {
+                 (e.target as any).src = 'https://via.placeholder.com/400x225/111/444?text=Missing+Asset';
+              }}
             />
           ) : (
             <video
               src={item.url}
               controls
-              className="w-full h-full object-cover"
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-contain bg-black/40"
             />
           )}
           <div className="absolute top-1.5 left-1.5 bg-black/60 rounded-sm px-1.5 py-0.5 flex items-center gap-1">
