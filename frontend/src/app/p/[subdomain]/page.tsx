@@ -348,21 +348,26 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                    };
 
                    
-                   try {
-                     const res = await fetch(`${API_URL}/portfolios/${portfolio.id}/inquire`, {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify(data)
-                     });
-                     if (res.ok) {
-                       alert("Proposition sent successfully! The creator will review and reach out.");
-                       form.reset();
-                     } else {
-                       alert("Failed to send. Please check your connection.");
-                     }
-                   } catch (err) {
-                     alert("Something went wrong. Please try again later.");
-                   }
+                    try {
+                      const res = await fetch(`${API_URL}/portfolios/${portfolio.id}/inquire`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                      });
+                      
+                      const result = await res.json();
+                      
+                      if (res.ok) {
+                        alert("Proposition sent successfully! The creator will review and reach out.");
+                        form.reset();
+                      } else {
+                        // Show the specific error from FastAPI (like 'at least 10 characters')
+                        const errorMsg = result.detail?.[0]?.msg || result.detail || "Failed to send.";
+                        alert(`Clearance Error: ${errorMsg}`);
+                      }
+                    } catch (err) {
+                      alert("Network Error. Check your internet or backend status.");
+                    }
                  }}
                >
                   <div>
