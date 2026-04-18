@@ -444,9 +444,55 @@ def update_my_portfolio(
 
 @app.get("/portfolios", response_model=list[schemas.PortfolioResponse])
 def get_all_portfolios(db: Session = Depends(get_db)):
-    # Marketplace: discovery of editors
+    # Discovery of editors
     portfolios = db.query(models.Portfolio).all()
     return portfolios
+
+@app.post("/portfolios/match", response_model=list[schemas.MatchResult])
+def match_portfolios(request: schemas.MatchRequest, db: Session = Depends(get_db)):
+    """The Matchmaker Engine: Semantic keyword scoring for creator discovery."""
+    query = request.reference_text.lower()
+    portfolios = db.query(models.Portfolio).all()
+    results = []
+
+    for p in portfolios:
+        score = 0
+        reasons = []
+        
+        # 1. Check Skills (High Weight)
+        if p.skills:
+            skills_list = [s.strip().lower() for s in p.skills.split(',')]
+            for s in skills_list:
+                if s in query:
+                    score += 40
+                    reasons.append(f"Mastery in {s}")
+        
+        # 2. Check Bio
+        if p.bio and any(word in p.bio.lower() for word in query.split()):
+            score += 20
+            reasons.append("Clinical profile match")
+            
+        # 3. Check Projects (Visual Proof)
+        project_hits = 0
+        for project in p.projects:
+            proj_text = (project.title + " " + (project.description or "")).lower()
+            if any(word in proj_text for word in query.split()):
+                project_hits += 1
+        
+        if project_hits > 0:
+            score += min(project_hits * 10, 40)
+            reasons.append(f"Visual proof in {project_hits} project(s)")
+
+        if score > 0:
+            results.append({
+                "portfolio": p,
+                "match_score": min(score, 100),
+                "match_reason": " • ".join(reasons[:2])
+            })
+
+    # Sort by score descending
+    results.sort(key=lambda x: x["match_score"], reverse=True)
+    return results
     
     
 
