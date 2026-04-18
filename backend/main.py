@@ -31,6 +31,10 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 app = FastAPI(title="Portfolio SaaS API")
 
+@app.get("/health")
+def health_check():
+    return {"status": "awake"}
+
 # ── Security Headers Middleware ────────────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
