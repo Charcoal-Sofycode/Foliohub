@@ -29,6 +29,9 @@ export const viewport = {
   userScalable: false,
 };
 
+import { UploadProvider } from "@/context/UploadContext";
+import BackgroundUploader from "@/components/BackgroundUploader";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,7 +44,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans bg-[#050505] text-white selection:bg-white selection:text-black overflow-x-hidden">
         <div className="fixed inset-0 z-[-1] bg-[radial-gradient(circle_at_50%_0%,rgba(20,20,20,1)_0%,rgba(5,5,5,1)_100%)]"></div>
-        {children}
+        <UploadProvider>
+          {children}
+          <BackgroundUploader />
+        </UploadProvider>
       </body>
     </html>
   );

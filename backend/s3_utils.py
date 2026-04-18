@@ -102,4 +102,67 @@ def generate_presigned_post(file_name: str, file_type: str, expiration=3600):
         return response
     except Exception as e:
         print(f"Error generating presigned post: {e}")
-        return None
+        return None
+# --- RESUMABLE MULTIPART UPLOAD LOGIC ---
+
+def initiate_multipart_upload(file_name: str, file_type: str):
+    \"\"\"Initiates a multipart upload and returns the UploadId and Key.\"\"\"
+    try:
+        s3_client = get_s3_client()
+        config = get_config()
+        
+        file_extension = file_name.split(\".\")[-1]
+        object_key = f\"{uuid.uuid4()}.{file_extension}\"
+        
+        response = s3_client.create_multipart_upload(
+            Bucket=config[\"bucket\"],
+            Key=object_key,
+            ContentType=file_type
+        )
+        
+        return {
+            \"upload_id\": response[\"UploadId\"],
+            \"object_key\": object_key,
+            \"file_url\": f\"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{object_key}\"
+        }
+    except Exception as e:
+        print(f\"S3 Multipart Initiation Error: {e}\")
+        return None
+
+def generate_presigned_part_url(object_key: str, upload_id: str, part_number: int):
+    \"\"\"Generates a presigned URL for a specific part of a multipart upload.\"\"\"
+    try:
+        s3_client = get_s3_client()
+        config = get_config()
+        
+        return s3_client.generate_presigned_url(
+            'upload_part',
+            Params={
+                'Bucket': config[\"bucket\"],
+                'Key': object_key,
+                'UploadId': upload_id,
+                'PartNumber': part_number
+            },
+            ExpiresIn=3600
+        )
+    except Exception as e:
+        print(f\"S3 Presign Part Error: {e}\")
+        return None
+
+def complete_multipart_upload(object_key: str, upload_id: str, parts: list):
+    \"\"\"Finalizes the multipart upload by assembling all parts.\"\"\"
+    try:
+        s3_client = get_s3_client()
+        config = get_config()
+        
+        # 'parts' must be a list of dicts: [{'ETag': '...', 'PartNumber': 1}, ...]
+        s3_client.complete_multipart_upload(
+            Bucket=config[\"bucket\"],
+            Key=object_key,
+            UploadId=upload_id,
+            MultipartUpload={'Parts': parts}
+        )
+        return True
+    except Exception as e:
+        print(f\"S3 Multipart Completion Error: {e}\")
+        return False

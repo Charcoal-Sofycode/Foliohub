@@ -223,6 +223,21 @@ class MatchResult(BaseModel):
     match_score: int
     match_reason: str
 
+# --- MULTIPART RESUMABLE UPLOADS ---
+
+class MultipartInitiate(BaseModel):
+    file_name: str
+    file_type: str
+
+class MultipartPart(BaseModel):
+    PartNumber: int
+    ETag: str
+
+class MultipartComplete(BaseModel):
+    object_key: str
+    upload_id: str
+    parts: list[MultipartPart]
+
 
 
 PortfolioResponse.model_rebuild()

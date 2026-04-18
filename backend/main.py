@@ -408,13 +408,27 @@ def reset_password_otp(data: schemas.ResetPasswordOTP, db: Session = Depends(get
     return {"message": "Password has been successfully reset. You may now log in."}
 
 
-@app.get("/generate-upload-url")
-def get_upload_url(file_name: str, file_type: str, current_user: models.User = Depends(get_current_user)):
-    """Generate a presigned post for direct S3 upload."""
-    data = s3_utils.generate_presigned_post(file_name, file_type)
-    if not data:
-        raise HTTPException(status_code=500, detail="Could not generate upload params.")
     return data
+
+@app.post("/upload/initiate")
+def initiate_upload(data: schemas.MultipartInitiate, current_user: models.User = Depends(get_current_user)):
+    """Initiate a multi-stage upload session for large cinematic files."""
+    return s3_utils.initiate_multipart_upload(data.file_name, data.file_type)
+
+@app.get("/upload/presign-part")
+def presign_part(object_key: str, upload_id: str, part_number: int, current_user: models.User = Depends(get_current_user)):
+    """Generate a high-security temporary signature for a specific video chunk."""
+    url = s3_utils.generate_presigned_part_url(object_key, upload_id, part_number)
+    return {"url": url}
+
+@app.post("/upload/complete")
+def complete_upload(data: schemas.MultipartComplete, current_user: models.User = Depends(get_current_user)):
+    """Instruct S3 to assemble all uploaded chunks into a finalized master file."""
+    parts_dicts = [p.model_dump() for p in data.parts]
+    success = s3_utils.complete_multipart_upload(data.object_key, data.upload_id, parts_dicts)
+    if not success:
+        raise HTTPException(status_code=400, detail="Media assembly failed. Network fragments may be missing.")
+    return {"message": "Cinematic master assembled successfully."}
 
 @app.post("/reset-password")
 def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):

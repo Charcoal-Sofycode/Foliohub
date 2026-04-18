@@ -10,6 +10,7 @@ import FolioLogo from '@/components/FolioLogo';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
+import { useUpload } from '@/context/UploadContext';
 
 const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
 
@@ -236,46 +237,7 @@ function DashboardContent() {
   };
 
 
-  const uploadToS3Direct = async (file: File, onProgress?: (pct: number) => void) => {
-    try {
-      // 1. Get upload params from our backend
-      const res = await api.get(`/generate-upload-url?file_name=${encodeURIComponent(file.name)}&file_type=${encodeURIComponent(file.type)}`);
-      const { url, fields, object_key } = res.data;
-
-      // 2. Construct form data for S3
-      const formData = new FormData();
-      Object.entries(fields).forEach(([k, v]) => formData.append(k, v as string));
-      formData.append('file', file);
-
-      // 3. Perform the actual upload to S3 directly
-      return new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url, true);
-        
-        if (onProgress) {
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              onProgress(Math.round((e.loaded / e.total) * 100));
-            }
-          };
-        }
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(object_key);
-          } else {
-            console.error("S3 Response:", xhr.responseText);
-            reject(new Error(`S3 Upload Failed: ${xhr.status}`));
-          }
-        };
-        xhr.onerror = () => reject(new Error('Network Error during S3 Upload'));
-        xhr.send(formData);
-      });
-    } catch (err) {
-      console.error("Presigned URL error:", err);
-      throw err;
-    }
-  };
+  const { startMultipartUpload } = useUpload();
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,76 +245,62 @@ function DashboardContent() {
 
     setIsUploading(true);
     setError('');
-    setUploadProgress(0);
+    setIsModalOpen(false); // Close modal now, we are uploading in BG
 
     try {
-      // Step 1: Upload heavy files directly to S3
-      // We do this in sequence or parallel. For stability, let's do sequential or handle progress aggregate.
-      let media_key = "";
-      let raw_media_key = "";
-      let project_file_key = "";
+      let final_media_key = "";
+      let final_raw_key = "";
+      let final_project_key = "";
 
-      // Track progress across all files
-      setUploadProgress(10); // Start
-      
-      console.log("Starting direct S3 uploads...");
-      
-      // Upload Main File
-      media_key = await uploadToS3Direct(selectedFile, (p) => setUploadProgress(10 + (p * 0.4)));
+      // Start the chain
+      // 1. Primary Video
+      await startMultipartUpload(selectedFile, async (url) => {
+        final_media_key = url.split('.amazonaws.com/')[-1];
+        
+        // 2. Raw Video (if exists) - usually small or we handle in sequence
+        if (uploadRawFile) {
+           await startMultipartUpload(uploadRawFile, async (rawUrl) => {
+              final_raw_key = rawUrl.split('.amazonaws.com/')[-1];
+              finishProjectCreation(final_media_key, final_raw_key, final_project_key);
+           });
+        } else {
+           finishProjectCreation(final_media_key, final_raw_key, final_project_key);
+        }
+      });
 
-      // Upload Raw File if exists
-      if (uploadRawFile) {
-        setUploadProgress(50);
-        raw_media_key = await uploadToS3Direct(uploadRawFile, (p) => setUploadProgress(50 + (p * 0.2)));
-      }
+      // Clear form immediately
+      setUploadTitle('');
+      setUploadDesc('');
+      setIsUploading(false);
 
-      // Upload Project File if exists
-      if (uploadProjectFile) {
-        setUploadProgress(70);
-        project_file_key = await uploadToS3Direct(uploadProjectFile, (p) => setUploadProgress(70 + (p * 0.2)));
-      }
+    } catch (err: any) {
+      console.error("BG Upload Trigger Error:", err);
+      setError('Failed to initiate secure background transfer.');
+      setIsUploading(false);
+    }
+  };
 
-      setUploadProgress(95);
-
-      // Step 2: Notify Backend with the S3 keys
+  const finishProjectCreation = async (mKey: string, rKey: string, pKey: string) => {
+    try {
       const formData = new FormData();
       formData.append('title', uploadTitle);
       formData.append('description', uploadDesc);
       formData.append('project_type', 'video');
       formData.append('category', uploadCategory);
-      
-      formData.append('media_key', media_key);
-      if (raw_media_key) formData.append('raw_media_key', raw_media_key);
-      if (project_file_key) formData.append('project_file_key', project_file_key);
+      formData.append('media_key', mKey);
+      if (rKey) formData.append('raw_media_key', rKey);
+      if (pKey) formData.append('project_file_key', pKey);
       
       if (uploadRole) formData.append('role', uploadRole);
       if (uploadTools) formData.append('tools_used', uploadTools);
       if (uploadTimeline) formData.append('timeline_breakdown', uploadTimeline);
 
       await api.post('/projects', formData);
-
-      setUploadProgress(100);
-
-      setTimeout(async () => {
-        await fetchPortfolio();
-        setUploadTitle('');
-        setUploadDesc('');
-        setUploadCategory('general');
-        setUploadRole('');
-        setUploadTools('');
-        setUploadTimeline('');
-        setSelectedFile(null);
-        setUploadProjectFile(null);
-        setUploadRawFile(null);
-        setIsUploading(false);
-        setUploadProgress(0);
-        setIsModalOpen(false); // Close modal automatically
-      }, 1000);
+      await fetchPortfolio();
       
-    } catch (err: any) {
-      console.error("Direct Upload Error:", err);
-      setError('Upload failed. Huge files might require high-speed internet or multiple attempts.');
-      setIsUploading(false);
+      // Notify user somehow? The background dock shows success.
+    } catch(e) {
+      console.error("Late Project Creation Error", e);
     }
   };
 
