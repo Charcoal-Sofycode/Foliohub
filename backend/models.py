@@ -139,4 +139,13 @@ class Inquiry(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationship
-    portfolio = relationship("Portfolio", back_populates="inquiries")
+    portfolio = relationship("Portfolio", back_populates="inquiries")
+
+class SignupOTP(Base):
+    __tablename__ = "signup_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True, nullable=False)
+    otp_code = Column(String(6), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

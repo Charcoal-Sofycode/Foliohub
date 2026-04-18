@@ -7,6 +7,14 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
 
+class SignupRequestOTP(BaseModel):
+    email: EmailStr
+
+class UserCreateVerified(BaseModel):
+    email: EmailStr
+    password: str
+    otp_code: str
+
 # Schema for what we return to the frontend (notice we NEVER return the password)
 class UserResponse(BaseModel):
     id: int

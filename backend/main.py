@@ -68,20 +68,64 @@ def read_root():
 
 # --- AUTHENTICATION ROUTES ---
 
+@app.post("/signup/request-otp")
+@limiter.limit("3/minute")
+def request_signup_otp(request: Request, data: schemas.SignupRequestOTP, db: Session = Depends(get_db)):
+    # 1. Check if email already exists
+    existing_user = db.query(models.User).filter(models.User.email == data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # 2. Generate OTP
+    otp = f"{random.SystemRandom().randint(0, 999999):06d}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    # 3. Save to signup_otps table (upsert if already exists)
+    db_otp = db.query(models.SignupOTP).filter(models.SignupOTP.email == data.email).first()
+    if db_otp:
+        db_otp.otp_code = otp
+        db_otp.expires_at = expires_at
+    else:
+        new_otp = models.SignupOTP(email=data.email, otp_code=otp, expires_at=expires_at)
+        db.add(new_otp)
+    
+    db.commit()
+
+    # 4. Send email
+    subject = "FolioHub — Your Verification Code"
+    body = f"Welcome to FolioHub!\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 10 minutes. Use it to complete your studio setup."
+    email_utils.send_email(data.email, subject, body)
+
+    return {"message": "Verification code sent to your email."}
+
 @app.post("/signup", response_model=schemas.UserResponse)
 @limiter.limit("5/minute")
-def create_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # 1. Check if the email already exists in Supabase
-    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+def create_user(request: Request, user_data: schemas.UserCreateVerified, db: Session = Depends(get_db)):
+    # 1. Verify OTP
+    db_otp = db.query(models.SignupOTP).filter(
+        models.SignupOTP.email == user_data.email,
+        models.SignupOTP.otp_code == user_data.otp_code
+    ).first()
+
+    if not db_otp:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    if db_otp.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Verification code expired. Please request a new one.")
+
+    # 2. Final check if user was created while verifying
+    db_user = db.query(models.User).filter(models.User.email == user_data.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # 2. Hash the password
-    hashed_password = auth.get_password_hash(user.password)
-    
-    # 3. Create the new user and save to database
-    new_user = models.User(email=user.email, hashed_password=hashed_password)
+    # 3. Hash and Save
+    hashed_password = auth.get_password_hash(user_data.password)
+    new_user = models.User(email=user_data.email, hashed_password=hashed_password)
     db.add(new_user)
+    
+    # 4. Cleanup OTP
+    db.delete(db_otp)
+    
     db.commit()
     db.refresh(new_user)
     
