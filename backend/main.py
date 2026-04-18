@@ -39,9 +39,18 @@ def health_check():
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
+# If "*" is allowed, we must use allow_origin_regex or reflect origin to work with allow_credentials=True
+if "*" in ALLOWED_ORIGINS:
+    allow_origins = []
+    allow_origin_regex = ".*" # Match everything but satisfy credentials requirement
+else:
+    allow_origins = ALLOWED_ORIGINS
+    allow_origin_regex = None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=allow_origins,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
@@ -69,7 +78,7 @@ async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"detail": "Studio rate limit exceeded. Please wait a moment before trying again."},
     )
     origin = request.headers.get("origin")
-    if origin in ALLOWED_ORIGINS:
+    if origin and ("*" in ALLOWED_ORIGINS or origin in ALLOWED_ORIGINS):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
