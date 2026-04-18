@@ -47,12 +47,13 @@ def transcode_video(project_id: int):
         # Check if ffmpeg exists locally in the backend folder
         ffmpeg_bin = "./ffmpeg.exe" if os.path.exists("./ffmpeg.exe") else "ffmpeg"
         
+        # Use -threads 1 and -preset ultrafast to save RAM on Render Free Tier
         ffmpeg_cmd = [
             ffmpeg_bin, "-i", input_path,
-            "-vcodec", "libx264", "-crf", "23",
-            "-preset", "medium", "-maxrate", "5000k", "-bufsize", "10000k",
-            "-vf", "scale=-2:1080",
-            "-acodec", "aac", "-b:a", "128k",
+            "-vcodec", "libx264", "-crf", "28",
+            "-preset", "ultrafast", "-threads", "1",
+            "-vf", "scale=-2:720",
+            "-acodec", "aac", "-b:a", "96k",
             "-movflags", "+faststart",
             "-y", output_path
         ]

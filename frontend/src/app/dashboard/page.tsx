@@ -153,7 +153,7 @@ function DashboardContent() {
       } catch (e) {
         console.error("Polling Sync Error", e);
       }
-    }, 5000);
+    }, 15000);
 
     return () => clearInterval(pollInterval);
   }, [portfolio?.projects]); // Dependency on projects array allows detecting new uploads and status changes
