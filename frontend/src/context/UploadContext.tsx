@@ -83,7 +83,14 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
               headers: { 'Content-Type': file.type }
             });
 
-            etag = uploadRes.headers.etag;
+            // S3 ETag is often quoted. Axios headers are lowercase.
+            // CAUTION: ETag must be in ExposeHeaders in S3 CORS policy
+            etag = uploadRes.headers.etag || uploadRes.headers.ETag || '';
+            
+            if (!etag) {
+              throw new Error("S3 ETag header missing. Ensure 'ETag' is in your S3 Bucket's ExposeHeaders CORS policy.");
+            }
+
             success = true;
             break;
           } catch (e) {
