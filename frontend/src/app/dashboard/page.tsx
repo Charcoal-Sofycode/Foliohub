@@ -431,6 +431,27 @@ function DashboardContent() {
     }
   };
 
+  const handleDeleteInquiry = async (id: number) => {
+    if (!confirm("Remove this lead permanently? This cannot be undone.")) return;
+    try {
+      await api.delete(`/inquiries/${id}`);
+      fetchInquiries();
+    } catch (e) {
+      alert("Failed to delete inquiry.");
+    }
+  };
+
+  const handleReportInquiry = async (id: number) => {
+    if (!confirm("Report this lead as spam/unusual to the Sofycode Security Team?")) return;
+    try {
+      await api.post(`/inquiries/${id}/report`);
+      alert("Report submitted. Thank you for keeping Foliohub safe.");
+      fetchInquiries();
+    } catch (e) {
+      alert("Failed to submit report.");
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
@@ -1041,17 +1062,31 @@ function DashboardContent() {
                              <a href={`mailto:${lead.email}`} className="px-6 py-3 bg-white text-black text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition">
                                Reply
                              </a>
-                             {!lead.is_read && (
-                                <button 
-                                  onClick={async () => {
-                                    await api.patch(`/inquiries/${lead.id}/read`);
-                                    fetchInquiries();
-                                  }}
-                                  className="px-6 py-3 border border-zinc-800 text-zinc-400 text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition"
-                                >
-                                  Archive
-                                </button>
-                             )}
+                                 <button 
+                                   onClick={async () => {
+                                     await api.patch(`/inquiries/${lead.id}/read`);
+                                     fetchInquiries();
+                                   }}
+                                   className="px-6 py-3 border border-zinc-800 text-zinc-400 text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition"
+                                   title="Archive Lead"
+                                 >
+                                   Archive
+                                 </button>
+                              )}
+                              <button 
+                                onClick={() => handleReportInquiry(lead.id)}
+                                className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-red-400 hover:border-red-400/30 transition group"
+                                title="Report Spam"
+                              >
+                                <AlertCircle className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteInquiry(lead.id)}
+                                className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-white hover:bg-red-500/10 transition"
+                                title="Delete Lead"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                           </div>
                         </div>
                       ))}

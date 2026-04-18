@@ -793,4 +793,51 @@ def mark_inquiry_read(inquiry_id: int, db: Session = Depends(get_db), current_us
     db.commit()
     return {"message": "Inquiry marked as read"}
 
+@app.delete("/inquiries/{inquiry_id}")
+def delete_inquiry(inquiry_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+    db_inquiry = db.query(models.Inquiry).filter(models.Inquiry.id == inquiry_id, models.Inquiry.portfolio_id == portfolio.id).first()
+    if not db_inquiry:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    
+    db.delete(db_inquiry)
+    db.commit()
+    return {"message": "Inquiry deleted"}
+
+@app.post("/inquiries/{inquiry_id}/report")
+def report_inquiry(inquiry_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+    db_inquiry = db.query(models.Inquiry).filter(models.Inquiry.id == inquiry_id, models.Inquiry.portfolio_id == portfolio.id).first()
+    if not db_inquiry:
+        raise HTTPException(status_code=404, detail="Inquiry not found")
+    
+    # Send report to official email
+    from email_utils import send_email
+    report_content = f"""
+    SPAM REPORT ALERT
+    -----------------
+    Reporter: {current_user.email} (Portfolio: {portfolio.subdomain})
+    Inquiry ID: {db_inquiry.id}
+    Sender Name: {db_inquiry.name}
+    Sender Email: {db_inquiry.email}
+    Details: {db_inquiry.project_details}
+    """
+    
+    try:
+        send_email("officialsofycode@gmail.com", "FOLIOHUB SPAM REPORTED", report_content)
+    except Exception as e:
+        print(f"Failed to send spam report email: {e}")
+
+    # Optionally mark it as read or move to a "reported" state
+    db_inquiry.is_read = True
+    db.commit()
+    
+    return {"message": "Report submitted. Our team will investigate. Thank you."}
+
 
