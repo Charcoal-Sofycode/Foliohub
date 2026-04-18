@@ -479,23 +479,26 @@ def create_portfolio(
     
     return new_portfolio
 
-@app.get("/portfolios/me", response_model=schemas.PortfolioResponse)
+@app.get("/portfolios/me")
 def get_my_portfolio(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Fetch the portfolio for the currently logged-in user
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
     
+    # Use a dictionary to avoid SQLAlchemy attribute reset issues
+    port_dict = schemas.PortfolioResponse.model_validate(portfolio).model_dump()
+    
     # SECURITY: Generate temporary signatures for all studio assets
-    for project in portfolio.projects:
-        if project.media_url:
-            project.media_url = s3_utils.get_presigned_url(project.media_url)
-        if project.raw_media_url:
-            project.raw_media_url = s3_utils.get_presigned_url(project.raw_media_url)
-        if project.optimized_url:
-            project.optimized_url = s3_utils.get_presigned_url(project.optimized_url)
+    for project in port_dict["projects"]:
+        if project.get("media_url"):
+            project["media_url"] = s3_utils.get_presigned_url(project["media_url"])
+        if project.get("raw_media_url"):
+            project["raw_media_url"] = s3_utils.get_presigned_url(project["raw_media_url"])
+        if project.get("optimized_url"):
+            project["optimized_url"] = s3_utils.get_presigned_url(project["optimized_url"])
             
-    return portfolio
+    return port_dict
     
 @app.put("/portfolios/me", response_model=schemas.PortfolioResponse)
 def update_my_portfolio(
@@ -707,33 +710,36 @@ def get_portfolio_projects(subdomain: str, db: Session = Depends(get_db)):
     
     # SECURITY: Generate temporary signatures for public playback
     signed_projects = []
-    for project in portfolio.projects:
-        if project.media_url:
-            project.media_url = s3_utils.get_presigned_url(project.media_url)
-        if project.raw_media_url:
-            project.raw_media_url = s3_utils.get_presigned_url(project.raw_media_url)
-        if project.optimized_url:
-            project.optimized_url = s3_utils.get_presigned_url(project.optimized_url)
+    for project_obj in portfolio.projects:
+        project = schemas.ProjectResponse.model_validate(project_obj).model_dump()
+        if project.get("media_url"):
+            project["media_url"] = s3_utils.get_presigned_url(project["media_url"])
+        if project.get("raw_media_url"):
+            project["raw_media_url"] = s3_utils.get_presigned_url(project["raw_media_url"])
+        if project.get("optimized_url"):
+            project["optimized_url"] = s3_utils.get_presigned_url(project["optimized_url"])
         signed_projects.append(project)
         
     return signed_projects
     
-@app.get("/portfolios/view/{subdomain}", response_model=schemas.PortfolioResponse)
+@app.get("/portfolios/view/{subdomain}")
 def get_public_portfolio(subdomain: str, db: Session = Depends(get_db)):
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
         
+    port_dict = schemas.PortfolioResponse.model_validate(portfolio).model_dump()
+    
     # SECURITY: Generate temporary signatures for all assets in the public view
-    for project in portfolio.projects:
-        if project.media_url:
-            project.media_url = s3_utils.get_presigned_url(project.media_url)
-        if project.raw_media_url:
-            project.raw_media_url = s3_utils.get_presigned_url(project.raw_media_url)
-        if project.optimized_url:
-            project.optimized_url = s3_utils.get_presigned_url(project.optimized_url)
+    for project in port_dict["projects"]:
+        if project.get("media_url"):
+            project["media_url"] = s3_utils.get_presigned_url(project["media_url"])
+        if project.get("raw_media_url"):
+            project["raw_media_url"] = s3_utils.get_presigned_url(project["raw_media_url"])
+        if project.get("optimized_url"):
+            project["optimized_url"] = s3_utils.get_presigned_url(project["optimized_url"])
             
-    return portfolio
+    return port_dict
 
 @app.post("/ai/match", response_model=list[schemas.MatchResult])
 def ai_match_editors(request: schemas.MatchRequest, db: Session = Depends(get_db)):
