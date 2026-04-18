@@ -570,16 +570,16 @@ function DashboardContent() {
               <form onSubmit={handleCreatePortfolio} className="flex flex-col gap-6">
                 <div>
                   <label className="block text-xs uppercase tracking-[0.2em] font-medium text-zinc-500 mb-4">Workspace URL</label>
-                  <div className="relative flex items-center group">
+                  <div className="relative flex flex-col sm:flex-row items-start sm:items-center group">
                     <input 
                       type="text" 
                       placeholder="yourname"
-                      className="w-full py-4 pl-0 pr-40 bg-transparent border-b-2 border-zinc-800 focus:border-white outline-none transition-colors text-white font-medium text-lg placeholder-zinc-800"
+                      className="w-full py-4 pl-0 pr-4 sm:pr-40 bg-transparent border-b-2 border-zinc-800 focus:border-white outline-none transition-colors text-white font-medium text-lg placeholder-zinc-800"
                       value={subdomain}
                       onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                       required
                     />
-                    <span className="absolute right-0 text-zinc-600 pointer-events-none font-medium">
+                    <span className="mt-2 sm:mt-0 sm:absolute sm:right-0 text-zinc-600 pointer-events-none font-medium text-sm sm:text-base">
                       .yourplatform.com
                     </span>
                   </div>
@@ -687,17 +687,17 @@ function DashboardContent() {
           <main className="flex-1 overflow-y-auto p-4 md:p-12 relative scroll-smooth bg-[#0a0a0a] pb-24 md:pb-12">
             <div className="max-w-6xl mx-auto pb-24">
               
-              <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12 border-b border-zinc-900 pb-8">
-                <div>
+              <header className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-12 border-b border-zinc-900 pb-10">
+                <div className="text-center md:text-left">
                   <h2 className="text-4xl font-bold tracking-tighter mb-2 capitalize">{activeTab}</h2>
-                  <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Master Control Panel</p>
+                  <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-[0.2em]">Master Control Panel</p>
                 </div>
                 {activeTab === 'projects' && (
                   <button 
                     onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-white text-black font-bold uppercase tracking-widest text-[11px] rounded-sm hover:bg-zinc-200 transition active:scale-95"
+                    className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-white text-black font-bold uppercase tracking-widest text-[11px] rounded-sm hover:bg-zinc-200 transition active:scale-95 shadow-xl shadow-white/5"
                   >
-                    <UploadCloud className="w-4 h-4" /> Ingest Media
+                    <Plus className="w-4 h-4" /> Ingest Media
                   </button>
                 )}
               </header>
@@ -907,7 +907,7 @@ function DashboardContent() {
                        <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Primary Domain</label>
                        <input disabled type="text" value={portfolio.subdomain + ".yourplatform.com"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
                      </div>
-                     <div className="grid grid-cols-2 gap-8">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div>
                          <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Portfolio Title</label>
                          <input name="title" type="text" defaultValue={portfolio.title} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
@@ -921,7 +921,7 @@ function DashboardContent() {
                        <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Bio</label>
                        <textarea name="bio" defaultValue={portfolio.bio || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors h-24 resize-none" />
                      </div>
-                     <div className="grid grid-cols-2 gap-8">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div>
                          <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Skills (comma separated)</label>
                          <input name="skills" type="text" defaultValue={portfolio.skills || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
@@ -966,7 +966,7 @@ function DashboardContent() {
                      </div>
                      <div className="pt-8 border-t border-zinc-900">
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Security & Access</label>
-                        <div className="bg-black border border-zinc-800 p-6 rounded-lg flex items-center justify-between">
+                        <div className="bg-black border border-zinc-800 p-6 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                            <div>
                               <h4 className="font-bold text-white mb-1">Two-Factor Authentication</h4>
                               <p className="text-sm text-zinc-500">Require an email code for all unrecognized studio accesses.</p>
@@ -984,7 +984,7 @@ function DashboardContent() {
                                  setTwoFactorLoading(false);
                                }
                              }}
-                             className={`px-6 py-3 border text-[11px] uppercase tracking-widest font-bold transition flex items-center justify-center min-w-[140px]
+                             className={`w-full sm:w-auto px-6 py-3 border text-[11px] uppercase tracking-widest font-bold transition flex items-center justify-center min-w-[140px]
                                 ${twoFactorEnabled 
                                   ? 'border-green-500/50 bg-green-500/10 text-green-400 cursor-default' 
                                   : 'border-zinc-700 text-white hover:bg-white hover:text-black cursor-pointer'}`}
@@ -1016,9 +1016,9 @@ function DashboardContent() {
                                    <p className="text-sm text-zinc-500">Update the primary email used for dashboard access and system alerts.</p>
                                 </div>
                              </div>
-                             <form onSubmit={handleUpdateEmail} className="flex gap-4">
+                             <form onSubmit={handleUpdateEmail} className="flex flex-col sm:flex-row gap-4">
                                 <input name="newEmail" type="email" placeholder="new-identity@studio.com" required className="flex-1 bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm text-white font-light outline-none transition-colors" />
-                                <button type="submit" disabled={managementLoading} className="px-6 py-2 border border-zinc-700 text-white text-[10px] uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Update Identity</button>
+                                <button type="submit" disabled={managementLoading} className="w-full sm:w-auto px-6 py-2 border border-zinc-700 text-white text-[10px] uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Update Identity</button>
                              </form>
                           </div>
 
@@ -1043,7 +1043,7 @@ function DashboardContent() {
 
                           {/* GDPR Privacy Section */}
                           <div className="bg-[#050505] border border-zinc-900 p-8 rounded-xl">
-                             <div className="flex items-start justify-between">
+                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8">
                                 <div>
                                    <h4 className="font-bold text-white mb-1 flex items-center gap-2"><Shield className="w-4 h-4 text-zinc-500" /> Privacy & Data Portability</h4>
                                    <p className="text-sm text-zinc-500 max-w-lg leading-relaxed">In accordance with GDPR, you have the right to access and port your data. You can download a structured digital archive of your entire studio history.</p>
@@ -1051,7 +1051,7 @@ function DashboardContent() {
                                 <button 
                                   onClick={handleExportData}
                                   disabled={managementLoading}
-                                  className="px-6 py-3 border border-white text-white text-[10px] uppercase font-bold tracking-widest hover:bg-white hover:text-black transition flex items-center gap-2"
+                                  className="w-full sm:w-auto px-6 py-3 border border-white text-white text-[10px] uppercase font-bold tracking-widest hover:bg-white hover:text-black transition flex items-center justify-center gap-2"
                                 >
                                    <DownloadCloud className="w-4 h-4" /> Download archive
                                 </button>
