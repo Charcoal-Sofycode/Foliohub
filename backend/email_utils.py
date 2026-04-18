@@ -204,3 +204,28 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
     except Exception as exc:
         logger.error(f"Failed to send 2FA email: {exc}")
         return False
+
+def send_email(to_email: str, subject: str, body: str) -> bool:
+    """
+    Generic function to send a plain text email.
+    """
+    if not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning(f"[DEV] SMTP not configured. Email to {to_email}: {subject}")
+        print(f"\n{'='*50}\n  FolioHub System Alert: {subject}\n  To: {to_email}\n  Body: {body}\n{'='*50}\n")
+        return True
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = EMAIL_FROM
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        return True
+    except Exception as exc:
+        logger.error(f"Failed to send email to {to_email}: {exc}")
+        return False
