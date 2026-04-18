@@ -349,7 +349,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
 
                    
                    try {
-                     const res = await fetch(`http://localhost:8000/portfolios/${portfolio.id}/inquire`, {
+                     const res = await fetch(`${API_URL}/portfolios/${portfolio.id}/inquire`, {
                        method: 'POST',
                        headers: { 'Content-Type': 'application/json' },
                        body: JSON.stringify(data)
