@@ -1062,17 +1062,18 @@ function DashboardContent() {
                              <a href={`mailto:${lead.email}`} className="px-6 py-3 bg-white text-black text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition">
                                Reply
                              </a>
-                                 <button 
-                                   onClick={async () => {
-                                     await api.patch(`/inquiries/${lead.id}/read`);
-                                     fetchInquiries();
-                                   }}
-                                   className="px-6 py-3 border border-zinc-800 text-zinc-400 text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition"
-                                   title="Archive Lead"
-                                 >
-                                   Archive
-                                 </button>
-                              )}
+                             {!lead.is_read && (
+                                <button 
+                                  onClick={async () => {
+                                    await api.patch(`/inquiries/${lead.id}/read`);
+                                    fetchInquiries();
+                                  }}
+                                  className="px-6 py-3 border border-zinc-800 text-zinc-400 text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-900 hover:text-white transition"
+                                  title="Archive Lead"
+                                >
+                                  Archive
+                                </button>
+                             )}
                               <button 
                                 onClick={() => handleReportInquiry(lead.id)}
                                 className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-red-400 hover:border-red-400/30 transition group"
