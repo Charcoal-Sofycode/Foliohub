@@ -254,13 +254,13 @@ function DashboardContent() {
 
       // Start the chain
       // 1. Primary Video
-      await startMultipartUpload(selectedFile, async (url) => {
-        final_media_key = url.split('.amazonaws.com/')[-1];
+      await startMultipartUpload(selectedFile, async (url, key) => {
+        final_media_key = key;
         
         // 2. Raw Video (if exists) - usually small or we handle in sequence
         if (uploadRawFile) {
-           await startMultipartUpload(uploadRawFile, async (rawUrl) => {
-              final_raw_key = rawUrl.split('.amazonaws.com/')[-1];
+           await startMultipartUpload(uploadRawFile, async (rawUrl, rawKey) => {
+              final_raw_key = rawKey;
               finishProjectCreation(final_media_key, final_raw_key, final_project_key);
            });
         } else {

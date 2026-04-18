@@ -15,7 +15,7 @@ interface UploadStatus {
 
 interface UploadContextType {
   activeUploads: UploadStatus[];
-  startMultipartUpload: (file: File, onComplete: (url: string) => void) => Promise<string>;
+  startMultipartUpload: (file: File, onComplete: (url: string, key: string) => void) => Promise<{url: string, key: string}>;
   clearUpload: (id: string) => void;
 }
 
@@ -34,7 +34,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setActiveUploads(prev => prev.map(u => u.id === id ? { ...u, ...delta } : u));
   };
 
-  const startMultipartUpload = useCallback(async (file: File, onComplete: (url: string) => void) => {
+  const startMultipartUpload = useCallback(async (file: File, onComplete: (url: string, key: string) => void) => {
     const uploadIdInternal = Math.random().toString(36).substring(7);
     const newUpload: UploadStatus = {
       id: uploadIdInternal,
@@ -61,7 +61,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       // 2. Upload Chunks
       for (let i = 1; i <= totalParts; i++) {
         // Stop if cleared
-        if (!uploadsRef.current[uploadIdInternal]) return '';
+        if (!uploadsRef.current[uploadIdInternal]) return { url: '', key: '' };
 
         const start = (i - 1) * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -115,9 +115,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
       });
 
       updateStatus(uploadIdInternal, { status: 'completed', progress: 100 });
-      onComplete(file_url);
+      onComplete(file_url, object_key);
       
-      return file_url;
+      return { url: file_url, key: object_key };
 
     } catch (err: any) {
       console.error('Multipart Upload Failed', err);
@@ -125,7 +125,7 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         status: 'failed', 
         error: 'Network failure. Please retry upload.' 
       });
-      return '';
+      return { url: '', key: '' };
     }
   }, []);
 
