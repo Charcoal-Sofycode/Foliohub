@@ -89,26 +89,36 @@ export default function PortfolioPlayer({
         
         {/* Hover Overlay */}
         {!isProcessing && (
-          <div className={`absolute inset-0 bg-black/30 flex flex-col justify-between p-4 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <div className={`absolute inset-0 bg-black/40 flex flex-col justify-between p-4 transition-all duration-500 ease-in-out ${isHovered ? 'opacity-100 backdrop-blur-sm' : 'opacity-0 backdrop-blur-none'}`}>
             <div className="flex justify-end">
                <button 
                  onClick={(e) => { 
                    e.stopPropagation(); 
                    setIsMuted(!isMuted); 
                  }}
-                 className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white hover:bg-white hover:text-black transition"
+                 className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all"
                >
                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                </button>
             </div>
+            
             <div className="flex justify-center items-center">
-               <div className="w-12 h-12 rounded-full border border-white/30 bg-black/20 backdrop-blur-md flex items-center justify-center text-white scale-0 group-hover:scale-100 transition-transform duration-500 delay-100">
-                  <Maximize2 className="w-5 h-5" />
-               </div>
+               <motion.div 
+                 initial={{ scale: 0.8, opacity: 0 }}
+                 animate={{ scale: isHovered ? 1 : 0.8, opacity: isHovered ? 1 : 0 }}
+                 className="w-16 h-16 rounded-full border border-white/20 bg-black/40 backdrop-blur-md flex items-center justify-center text-white"
+               >
+                  <Play className="w-6 h-6 fill-current ml-1" />
+               </motion.div>
             </div>
-            <div className="flex justify-start">
-               <div className="bg-black/60 backdrop-blur-xl px-3 py-1.5 rounded text-[10px] uppercase tracking-widest text-white/90 font-mono flex items-center gap-2">
-                  <Play className="w-2.5 h-2.5 fill-white" /> Expand Studio View
+
+            <div className="flex justify-between items-end">
+               <div className="bg-black/80 backdrop-blur-2xl px-4 py-2 rounded-lg border border-white/5 text-[9px] uppercase tracking-[0.2em] text-white font-bold flex items-center gap-3">
+                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Master File Available
+               </div>
+               <div className="flex items-center gap-2 text-white/50 group-hover:text-white transition-colors duration-500">
+                  <span className="text-[10px] font-mono uppercase tracking-widest">Select</span>
+                  <Maximize2 className="w-4 h-4" />
                </div>
             </div>
           </div>
@@ -122,28 +132,35 @@ export default function PortfolioPlayer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 md:p-12"
+            className="fixed inset-0 z-[200] bg-black/98 backdrop-blur-[100px] flex items-center justify-center p-4 md:p-8 lg:p-12 overflow-hidden"
           >
+             {/* Security Layer Overlay */}
+             <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black to-transparent z-10 pointer-events-none" />
+             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none" />
+
              <button 
                onClick={() => { setIsFullscreen(false); }}
-               className="absolute top-6 right-6 lg:top-10 lg:right-10 text-zinc-500 hover:text-white transition z-10"
+               className="absolute top-6 right-6 lg:top-10 lg:right-10 w-12 h-12 bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all z-20"
              >
-               <X className="w-8 h-8" />
+               <X className="w-6 h-6" />
              </button>
              
-             <div className="absolute top-6 left-6 lg:top-10 lg:left-10 text-white z-10 flex flex-col md:flex-row md:items-center gap-6 md:gap-12">
-                <div>
-                   <p className="text-xs uppercase font-mono tracking-[0.3em] text-zinc-500">
-                     {isProcessing ? 'Master Status: Processing' : 'Master Status: Live'}
-                   </p>
-                   <h3 className="text-2xl font-bold tracking-tight mt-2">{title || "Untitled Masterpiece"}</h3>
+             <div className="absolute top-6 left-6 lg:top-10 lg:left-10 text-white z-20 flex flex-col md:flex-row md:items-center gap-6 md:gap-12">
+                <div className="max-w-xl">
+                   <div className="flex items-center gap-2 mb-1">
+                      <span className="w-2 h-2 bg-white rounded-full" />
+                      <p className="text-[9px] uppercase font-mono tracking-[0.4em] text-zinc-500">
+                        {isProcessing ? 'Studio Master: Processing' : 'Studio Master: Live'}
+                      </p>
+                   </div>
+                   <h3 className="text-3xl font-black tracking-tighter uppercase leading-none">{title || "Untitled Masterpiece"}</h3>
                 </div>
                 
                 {!isProcessing && (
-                  <div className="relative">
+                  <div className="relative pt-2 md:pt-0">
                      <button 
                        onClick={() => setQualityOpen(!qualityOpen)}
-                       className="flex items-center gap-2 px-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-full text-xs font-mono uppercase tracking-widest hover:bg-white hover:text-black transition"
+                       className="flex items-center gap-3 px-6 py-3 bg-zinc-900/40 border border-zinc-800 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-all"
                      >
                        <Settings className="w-3.5 h-3.5" /> {selectedQuality}
                      </button>
@@ -152,19 +169,19 @@ export default function PortfolioPlayer({
                        {qualityOpen && (
                          <motion.div 
                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                           className="absolute top-full left-0 mt-4 w-48 bg-[#0a0a0a] border border-zinc-800 rounded-xl overflow-hidden flex flex-col shadow-2xl z-50"
+                           className="absolute top-full left-0 mt-4 w-56 bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.5)] z-[250]"
                          >
                            {[
-                             {id: 'raw', label: '4K Lossless', sub: 'Original Master'},
-                             {id: 'web', label: 'Web Optimized', sub: 'High Speed Content'},
+                             {id: 'raw', label: '4K Lossless', sub: 'Native Quality (Slower)'},
+                             {id: 'web', label: 'Web Optimized', sub: 'Instant Playback'},
                            ].map(q => (
                               <button 
                                 key={q.id}
                                 onClick={() => { setSelectedQuality(q.label); setQualityOpen(false); }}
-                                className={`text-left px-4 py-4 transition flex flex-col gap-1 ${selectedQuality === q.label ? 'bg-white text-black' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'}`}
+                                className={`text-left px-5 py-5 transition flex flex-col gap-1.5 ${selectedQuality === q.label ? 'bg-white text-black' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'}`}
                               >
-                                <span className="text-[10px] font-bold tracking-widest uppercase">{q.label}</span>
-                                <span className="text-[8px] font-mono uppercase opacity-50">{q.sub}</span>
+                                <span className="text-[11px] font-bold tracking-[0.1em] uppercase">{q.label}</span>
+                                <span className="text-[8px] font-mono uppercase opacity-60">{q.sub}</span>
                               </button>
                            ))}
                          </motion.div>
@@ -175,23 +192,24 @@ export default function PortfolioPlayer({
              </div>
 
              <motion.div 
-               initial={{ scale: 0.95, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               transition={{ delay: 0.1, duration: 0.4, ease: "backOut" }}
-               className="w-full max-w-7xl aspect-video bg-[#050505] relative border border-white/10 shadow-2xl overflow-hidden rounded-lg"
+               initial={{ scale: 0.9, opacity: 0, y: 20 }}
+               animate={{ scale: 1, opacity: 1, y: 0 }}
+               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+               className="w-full max-w-6xl aspect-video bg-[#020202] relative border border-white/5 shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden rounded-2xl z-10"
              >
                 {isProcessing ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center">
-                    <div className="w-12 h-12 border-2 border-zinc-800 border-t-white rounded-full animate-spin mb-8" />
-                    <h4 className="text-xl font-black uppercase tracking-widest mb-2">Video Processing</h4>
-                    <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">We are preparing a web-optimized stream for this masterwork.</p>
-                  </div>
+                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] p-12 text-center">
+                     <div className="w-16 h-16 border-2 border-white/5 border-t-white rounded-full animate-spin mb-10" />
+                     <h4 className="text-2xl font-black uppercase tracking-[0.3em] mb-3">Engine in Motion</h4>
+                     <p className="text-zinc-500 font-mono text-[10px] tracking-[0.4em] uppercase max-w-sm leading-relaxed">Encoding a high-performance web stream for this professional asset.</p>
+                   </div>
                 ) : (
                   <div 
                     className="relative w-full h-full group bg-black"
                     onContextMenu={(e) => e.preventDefault()}
                   >
                     <video
+                      key={selectedQuality}
                       src={selectedQuality === '4K Lossless' ? url : (optimizedUrl || url)}
                       className="w-full h-full object-contain"
                       autoPlay
@@ -203,6 +221,11 @@ export default function PortfolioPlayer({
                   </div>
                 )}
              </motion.div>
+             
+             {/* Interaction Hint */}
+             <div className="absolute bottom-8 text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em] z-20">
+                Studio Viewport Focus Mode
+             </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -40,28 +40,35 @@ export default function BeforeAfterPlayer({
 
   // ─── Video Synchronization ────────────────────────────────────────────────
   
+  // ─── Video Synchronization ────────────────────────────────────────────────
+  
   const syncVideos = useCallback(() => {
-    if (!rawVideoRef.current || !finalVideoRef.current) return;
+    const leader = finalVideoRef.current; // Final Master is the leader
+    const follower = rawVideoRef.current; 
+    if (!leader || !follower) return;
     
-    const leader = rawVideoRef.current;
-    const follower = finalVideoRef.current;
-
-    // Strict time sync
-    if (Math.abs(leader.currentTime - follower.currentTime) > 0.05) {
-      follower.currentTime = leader.currentTime;
-    }
-
-    // Playback state sync
+    // Playback state sync with precision correction
     if (leader.paused !== follower.paused) {
       if (leader.paused) follower.pause();
       else follower.play().catch(() => {});
+    }
+
+    // Force strict frame alignment if they drift > 30ms (approx 1 frame)
+    const drift = Math.abs(leader.currentTime - follower.currentTime);
+    if (drift > 0.03) {
+      follower.currentTime = leader.currentTime;
+    }
+
+    // Ensure playback speed matches exactly
+    if (follower.playbackRate !== leader.playbackRate) {
+        follower.playbackRate = leader.playbackRate;
     }
 
     syncIntervalRef.current = requestAnimationFrame(syncVideos);
   }, []);
 
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && isReady) {
       syncIntervalRef.current = requestAnimationFrame(syncVideos);
     } else {
       if (syncIntervalRef.current) cancelAnimationFrame(syncIntervalRef.current);
@@ -69,37 +76,34 @@ export default function BeforeAfterPlayer({
     return () => {
       if (syncIntervalRef.current) cancelAnimationFrame(syncIntervalRef.current);
     };
-  }, [isPlaying, syncVideos]);
+  }, [isPlaying, isReady, syncVideos]);
 
   useEffect(() => {
     const v1 = rawVideoRef.current;
     const v2 = finalVideoRef.current;
-    if (!v1 || !v2) return;
+    if (!v1 || !v2 || !isReady) return;
 
     if (isPlaying) {
-      const p1 = v1.play();
-      const p2 = v2.play();
-      
-      Promise.all([p1, p2]).catch((err) => {
-        console.warn("Autoplay blocked or play interrupted", err);
-        setIsPlaying(false);
-      });
+      v1.play().catch(() => {});
+      v2.play().catch(() => {});
     } else {
       v1.pause();
       v2.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, isReady]);
 
   // ─── Audio Handling ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!rawVideoRef.current || !finalVideoRef.current) return;
     
+    // Cross-fade logic for audio based on slider position
     if (isMuted) {
       rawVideoRef.current.muted = true;
       finalVideoRef.current.muted = true;
     } else {
-      const rawVol = Math.max(0, Math.min(1, sliderPosition / 100));
-      const finalVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
+      // Linear crossfade: as you reveal Post-Production, Raw audio fades out
+      const rawVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
+      const finalVol = Math.max(0, Math.min(1, sliderPosition / 100));
       
       rawVideoRef.current.muted = false;
       finalVideoRef.current.muted = false;
