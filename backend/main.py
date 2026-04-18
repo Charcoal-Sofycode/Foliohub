@@ -483,6 +483,7 @@ def ai_match_editors(request: schemas.MatchRequest, db: Session = Depends(get_db
 @app.post("/create-checkout-session")
 def create_checkout_session(current_user: models.User = Depends(get_current_user)):
     try:
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -497,8 +498,8 @@ def create_checkout_session(current_user: models.User = Depends(get_current_user
                 'quantity': 1,
             }],
             mode='payment', # Use subscription for real recurring billing
-            success_url='http://localhost:3000/dashboard?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url='http://localhost:3000/dashboard',
+            success_url=f'{frontend_url}/dashboard?session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{frontend_url}/dashboard',
             client_reference_id=str(current_user.id)
         )
         return {"url": session.url}
