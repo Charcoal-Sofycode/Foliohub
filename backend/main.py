@@ -605,23 +605,31 @@ def create_project(
 
     # 2. Resolve URLs (Either upload from stream or use direct key)
     file_url = None
-    if media_key:
-        file_url = f"https://{s3_utils.get_config()['bucket']}.s3.{s3_utils.get_config()['region']}.amazonaws.com/{media_key}"
+    print(f"DEBUG: Processing Project Creation. media_key='{media_key}', raw_media_key='{raw_media_key}'")
+    
+    if media_key and media_key != "undefined":
+        config = s3_utils.get_config()
+        file_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{media_key}"
     elif file:
         file_url = s3_utils.upload_file_to_s3(file.file, file.filename)
     
     if not file_url:
-        raise HTTPException(status_code=400, detail="Either a file or a media_key must be provided.")
+        print("ERROR: Project creation aborted. No valid media_url resolved.")
+        raise HTTPException(status_code=400, detail="Either a file or a valid media_key must be provided.")
         
+    print(f"SUCCESS: Resolved media_url='{file_url}'")
+
     project_file_url = None
-    if project_file_key:
-        project_file_url = f"https://{s3_utils.get_config()['bucket']}.s3.{s3_utils.get_config()['region']}.amazonaws.com/{project_file_key}"
+    if project_file_key and project_file_key != "undefined":
+        config = s3_utils.get_config()
+        project_file_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{project_file_key}"
     elif project_file:
         project_file_url = s3_utils.upload_file_to_s3(project_file.file, project_file.filename)
         
     raw_media_url = None
-    if raw_media_key:
-        raw_media_url = f"https://{s3_utils.get_config()['bucket']}.s3.{s3_utils.get_config()['region']}.amazonaws.com/{raw_media_key}"
+    if raw_media_key and raw_media_key != "undefined":
+        config = s3_utils.get_config()
+        raw_media_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{raw_media_key}"
     elif raw_file:
         raw_media_url = s3_utils.upload_file_to_s3(raw_file.file, raw_file.filename)
 
