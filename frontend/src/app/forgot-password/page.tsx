@@ -112,8 +112,13 @@ export default function ForgotPasswordPage() {
       await api.post('/forgot-password', { email });
       setStep('otp');
       setResendCooldown(60);
-    } catch {
-      setError('An error occurred. Please try again.');
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+          setError('Studio not found. Redirecting to Signup...');
+          setTimeout(() => router.push('/signup'), 2500);
+      } else {
+          setError(err.response?.data?.detail || 'An error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

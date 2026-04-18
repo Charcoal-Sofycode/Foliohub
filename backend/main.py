@@ -305,21 +305,24 @@ def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depend
 def forgot_password(request: Request, data: schemas.ForgotPassword, db: Session = Depends(get_db)):
     """Step 1: Generate a 6-digit OTP and email it to the user."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
+    if not user:
+        raise HTTPException(
+            status_code=404, 
+            detail="Studio not found. Please verify your email or create a new account."
+        )
 
-    if user:
-        # Generate a cryptographically-adequate 6-digit OTP
-        otp = f"{random.SystemRandom().randint(0, 999999):06d}"
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    # Generate a cryptographically-adequate 6-digit OTP
+    otp = f"{random.SystemRandom().randint(0, 999999):06d}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
-        user.reset_otp = otp
-        user.reset_otp_expires_at = expires_at
-        db.commit()
+    user.reset_otp = otp
+    user.reset_otp_expires_at = expires_at
+    db.commit()
 
-        # Send the OTP via email (falls back to console print if SMTP not configured)
-        email_utils.send_otp_email(data.email, otp)
+    # Send the OTP via email
+    email_utils.send_otp_email(data.email, otp)
 
-    # Always return 200 to prevent email enumeration
-    return {"message": "If that email exists, a recovery code has been dispatched."}
+    return {"message": "Verification code dispatched to your studio email."}
 
 
 @app.post("/verify-otp")
