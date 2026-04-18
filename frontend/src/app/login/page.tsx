@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 import api from '@/lib/api';
 import FolioLogo from '@/components/FolioLogo';
 
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [is2FAStep, setIs2FAStep] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -138,14 +139,23 @@ export default function LoginPage() {
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Security Key</label>
                     <Link href="/forgot-password" className="text-xs text-zinc-600 hover:text-white transition">Forgot?</Link>
                   </div>
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light tracking-widest"
-                    placeholder="••••••••"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light tracking-widest pr-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-0 bottom-3 text-zinc-600 hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
