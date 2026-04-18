@@ -94,7 +94,7 @@ export default function Home() {
               playsInline 
               preload="metadata"
               className="w-full h-full object-cover relative z-0"
-              src="/hero-video.mp4" 
+              src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/3deba717-58ec-4c8e-8463-2c21b8f57c27.mp4" 
             />
             {/* Simple Overlay */}
             <div className="absolute inset-0 bg-black/60 z-10 pointer-events-none" />
@@ -139,7 +139,7 @@ export default function Home() {
                   playsInline 
                   preload="metadata"
                   className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-1000 ease-in-out"
-                  src="/editorial.mp4" 
+                  src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/40f15231-34e4-40d2-915a-165efd8c0fce.mp4" 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6 sm:p-10">
                   <p className="font-mono text-[10px] uppercase tracking-[0.2em]">01 / Flawless Streaming</p>
@@ -213,7 +213,7 @@ export default function Home() {
                 playsInline 
                 preload="metadata"
                 className="w-full h-full object-cover filter grayscale group-hover:grayscale-0 transition-all duration-700"
-                src="/hover.mp4" 
+                src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/7ab96903-dbcf-4d86-9dc8-08744fe7db98.mp4" 
               />
               <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition duration-500">
                  <span className="text-white font-bold tracking-[0.3em] uppercase mix-blend-overlay text-lg sm:text-xl">Hover Focus</span>

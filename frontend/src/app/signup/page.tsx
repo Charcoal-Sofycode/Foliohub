@@ -67,7 +67,7 @@ export default function SignupPage() {
             muted 
             playsInline 
             className="w-full h-full object-cover filter contrast-125 hover:grayscale-0 transition-all duration-[3000ms] ease-out grayscale select-none pointer-events-none"
-            src="/signup.mp4" 
+            src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/72de9afc-1b3c-4b2b-8efd-7a1fcb63d489.mp4" 
           />
         </div>
 
