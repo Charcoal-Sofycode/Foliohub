@@ -23,6 +23,8 @@ import {
   CheckCircle2,
   Share2,
   Eye,
+  DownloadCloud,
+  SlidersHorizontal,
   Link as LinkIcon,
   Play,
   Activity,
