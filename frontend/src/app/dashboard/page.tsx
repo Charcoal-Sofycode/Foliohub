@@ -109,9 +109,8 @@ function DashboardContent() {
       if (sessionId) {
         setIsVerifyingPayment(true);
         try {
-          // Explicitly verify session with backend
-          const res = await api.get(`/verify-payment?session_id=${sessionId}`);
-          if (res.data.status === 'success') {
+          const res = await api.get(`/verify-session/${sessionId}`);
+          if (res.data.status === 'premium') {
              setSubTier('premium');
           }
         } catch(e) {
