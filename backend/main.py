@@ -169,6 +169,79 @@ def verify_2fa(data: schemas.TwoFactorVerify, db: Session = Depends(get_db)):
     access_token = auth.create_access_token(data={"sub": user.email, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@app.patch("/users/me/email", response_model=schemas.UserResponse)
+def update_user_email(data: schemas.UserUpdateEmail, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Check if new email already exists
+    exists = db.query(models.User).filter(models.User.email == data.new_email).first()
+    if exists:
+        raise HTTPException(status_code=400, detail="This email is already registered to another studio.")
+    
+    current_user.email = data.new_email
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@app.patch("/users/me/password")
+def update_user_password(data: schemas.UserUpdatePassword, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Verify current password
+    if not auth.verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password verification failed.")
+    
+    # Update to new password
+    current_user.hashed_password = auth.get_password_hash(data.new_password)
+    db.commit()
+    return {"message": "Security key successfully rotated."}
+
+@app.delete("/users/me")
+def delete_user_account(data: schemas.UserDelete, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # 1. Final verification
+    if not auth.verify_password(data.password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Authentication failed. Account deletion aborted.")
+
+    # 2. Collect ALL S3 keys for deletion
+    keys_to_delete = []
+    
+    portfolio = current_user.portfolio
+    if portfolio:
+        for project in portfolio.projects:
+            if project.media_url: keys_to_delete.append(project.media_url)
+            if project.raw_media_url: keys_to_delete.append(project.raw_media_url)
+            if project.optimized_url: keys_to_delete.append(project.optimized_url)
+            if project.thumbnail_url: keys_to_delete.append(project.thumbnail_url)
+            
+            # Story media
+            if project.story:
+                story = project.story
+                stages = [
+                    story.brief_media, story.storyboard_media, 
+                    story.rough_cut_media, story.final_media
+                ]
+                for stage in stages:
+                    if stage:
+                        for item in stage:
+                            if isinstance(item, dict) and item.get('key'):
+                                keys_to_delete.append(item['key'])
+                
+                # Revision data
+                if story.revisions_data:
+                    for round_item in story.revisions_data:
+                        for m in round_item.get('media', []):
+                            if m.get('key'): keys_to_delete.append(m['key'])
+
+    # 3. Cleanse S3
+    for key in keys_to_delete:
+        try:
+            s3_utils.delete_file(key)
+        except:
+            pass # Continue if one file fails
+
+    # 4. Wipe Database entries
+    # (Cascading deletes if configured in models, otherwise manual)
+    db.delete(current_user)
+    db.commit()
+
+    return {"message": "Account and all associated assets have been permanently deleted from the grid."}
+
 @app.post("/enable-2fa")
 def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     current_user.is_2fa_enabled = True

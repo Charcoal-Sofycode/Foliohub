@@ -29,6 +29,7 @@ import {
   Zap,
   Check,
   Shield,
+  ShieldAlert,
   Sparkles,
   Mail,
   Trash2,
@@ -84,6 +85,11 @@ function DashboardContent() {
   // 2FA State
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [showManagePasswordModal, setShowManagePasswordModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [managementError, setManagementError] = useState('');
+  const [managementSuccess, setManagementSuccess] = useState('');
+  const [managementLoading, setManagementLoading] = useState(false);
 
   // Leads/Inquiries State
   const [inquiries, setInquiries] = useState<any[]>([]);
@@ -340,6 +346,69 @@ function DashboardContent() {
       alert("Failed to delete project.");
     } finally {
       setIsDeletingId(null);
+    }
+  };
+
+  const handleUpdateEmail = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setManagementLoading(true);
+    setManagementError('');
+    setManagementSuccess('');
+    const form = e.currentTarget;
+    const newEmail = (form.elements.namedItem('newEmail') as HTMLInputElement).value;
+    try {
+      await api.patch('/users/me/email', { new_email: newEmail });
+      setManagementSuccess('Professional email updated.');
+      window.location.reload(); 
+    } catch (err: any) {
+      setManagementError(err.response?.data?.detail || 'Update failed.');
+    } finally {
+      setManagementLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setManagementLoading(true);
+    setManagementError('');
+    setManagementSuccess('');
+    const form = e.currentTarget;
+    const currentPassword = (form.elements.namedItem('currentPassword') as HTMLInputElement).value;
+    const newPassword = (form.elements.namedItem('newPassword') as HTMLInputElement).value;
+    const confirmPassword = (form.elements.namedItem('confirmPass') as HTMLInputElement).value;
+
+    if (newPassword !== confirmPassword) {
+      setManagementError('New security keys do not match.');
+      setManagementLoading(false);
+      return;
+    }
+
+    try {
+      await api.patch('/users/me/password', { current_password: currentPassword, new_password: newPassword });
+      setManagementSuccess('Security key rotated successfully.');
+      setShowManagePasswordModal(false);
+    } catch (err: any) {
+      setManagementError(err.response?.data?.detail || 'Authentication failed.');
+    } finally {
+      setManagementLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setManagementLoading(true);
+    setManagementError('');
+    const form = e.currentTarget;
+    const password = (form.elements.namedItem('verifyPassword') as HTMLInputElement).value;
+
+    try {
+      await api.delete('/users/me', { data: { password } });
+      localStorage.removeItem('token');
+      router.push('/login');
+    } catch (err: any) {
+      setManagementError(err.response?.data?.detail || 'Verification failed. Account preserved.');
+    } finally {
+      setManagementLoading(false);
     }
   };
 
@@ -937,8 +1006,54 @@ function DashboardContent() {
                      </div>
 
                      <button type="submit" disabled={settingsLoading} className="px-8 py-4 bg-white text-black font-bold text-[11px] uppercase tracking-[0.2em] rounded-sm hover:bg-zinc-200 transition">Update Configuration</button>
-                   </form>
-                </motion.div>
+                    </form>
+
+                    <div className="mt-20 pt-10 border-t border-zinc-900">
+                       <h3 className="text-xl font-bold text-white mb-6 tracking-tight">Identity & Security Operations</h3>
+                       
+                       {managementError && (
+                          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-mono uppercase tracking-widest">{managementError}</div>
+                       )}
+                       {managementSuccess && (
+                          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 text-green-500 text-xs font-mono uppercase tracking-widest">{managementSuccess}</div>
+                       )}
+
+                       <div className="space-y-8">
+                          {/* Email Update */}
+                          <div className="bg-[#0a0a0a] border border-zinc-800 p-8 rounded-xl">
+                             <div className="flex items-start justify-between mb-8">
+                                <div>
+                                   <h4 className="font-bold text-white mb-1">Professional Identity</h4>
+                                   <p className="text-sm text-zinc-500">Update the primary email used for dashboard access and system alerts.</p>
+                                </div>
+                             </div>
+                             <form onSubmit={handleUpdateEmail} className="flex gap-4">
+                                <input name="newEmail" type="email" placeholder="new-identity@studio.com" required className="flex-1 bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm text-white font-light outline-none transition-colors" />
+                                <button type="submit" disabled={managementLoading} className="px-6 py-2 border border-zinc-700 text-white text-[10px] uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Update Identity</button>
+                             </form>
+                          </div>
+
+                          {/* Password & Nuke */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             <div className="bg-[#0a0a0a] border border-zinc-800 p-8 rounded-xl flex flex-col justify-between">
+                                <div>
+                                   <h4 className="font-bold text-white mb-1">Rotation Protocol</h4>
+                                   <p className="text-sm text-zinc-500 mb-6">Regularly rotate your Security Key to ensure maximum studio integrity.</p>
+                                </div>
+                                <button onClick={() => setShowManagePasswordModal(true)} className="w-full py-3 bg-zinc-900 border border-zinc-800 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-white hover:text-black transition">Initialize Rotation</button>
+                             </div>
+
+                             <div className="bg-red-500/5 border border-red-500/20 p-8 rounded-xl flex flex-col justify-between">
+                                <div>
+                                   <h4 className="font-bold text-red-500 mb-1 flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Destruction Protocol</h4>
+                                   <p className="text-sm text-zinc-500 mb-6">Permanently wipe your account, media, and digital footprint from the platform.</p>
+                                </div>
+                                <button onClick={() => setShowDeleteAccountModal(true)} className="w-full py-3 bg-red-600 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-red-700 transition">Commence Wipe</button>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                 </motion.div>
               )}
 
               {activeTab === 'billing' && (
@@ -1344,6 +1459,68 @@ function DashboardContent() {
                 </button>
               </form>
             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Security Modals */}
+      <AnimatePresence>
+        {showManagePasswordModal && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowManagePasswordModal(false)} className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0a0a0a] border border-zinc-800 p-8 sm:p-12 rounded-2xl max-w-md w-full shadow-2xl">
+                <h3 className="text-2xl font-bold text-white mb-2">Key Rotation</h3>
+                <p className="text-zinc-500 text-sm mb-8">Enter your current key to establish a new one.</p>
+                <form onSubmit={handleUpdatePassword} className="space-y-6">
+                   <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Current Key</label>
+                      <input name="currentPassword" type="password" required className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" />
+                   </div>
+                   <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">New Strategic Key</label>
+                      <input name="newPassword" type="password" required className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" />
+                   </div>
+                   <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Confirm New Key</label>
+                      <input name="confirmPass" type="password" required className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" />
+                   </div>
+                   <button type="submit" disabled={managementLoading} className="w-full py-4 bg-white text-black font-bold uppercase tracking-widest text-[11px] hover:bg-zinc-200 transition">Commit Rotation</button>
+                   <button type="button" onClick={() => setShowManagePasswordModal(false)} className="w-full text-zinc-600 text-[10px] uppercase tracking-widest hover:text-white transition">Abort</button>
+                </form>
+             </motion.div>
+          </div>
+        )}
+
+        {showDeleteAccountModal && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDeleteAccountModal(false)} className="absolute inset-0 bg-black/95 backdrop-blur-md" />
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0a0a0a] border border-red-500/20 p-8 sm:p-12 rounded-2xl max-w-lg w-full shadow-2xl">
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-8 border border-red-500/20">
+                   <ShieldAlert className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-3xl font-black text-white mb-4 uppercase tracking-tighter italic font-serif">Critical Warning</h3>
+                <div className="space-y-4 text-zinc-400 text-sm font-light leading-relaxed mb-10">
+                   <p><span className="text-white font-bold">This is an irreversible data wipe.</span> If you proceed, the following will occur:</p>
+                   <ul className="list-disc pl-5 space-y-2 text-xs">
+                      <li>Your studio master account will be terminated immediately.</li>
+                      <li>ALL raw footage, final edits, and project metadata will be purged from AWS S3.</li>
+                      <li>Your public portfolio domain will become dark.</li>
+                      <li>Leads, inquiries, and analytics data will be permanently shredded.</li>
+                   </ul>
+                   <p className="text-red-500/80 font-mono text-[10px] uppercase mt-4 tracking-widest">Once initiated, this protocol cannot be paused or recovered.</p>
+                </div>
+                
+                <form onSubmit={handleDeleteAccount} className="space-y-6">
+                   <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Confirm Identity with Security Key</label>
+                      <input name="verifyPassword" type="password" required placeholder="Enter key to confirm wipe" className="w-full bg-transparent border-b border-red-500/30 focus:border-red-500 py-3 text-white outline-none transition-colors" />
+                   </div>
+                   <button type="submit" disabled={managementLoading} className="w-full py-5 bg-red-600 text-white font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-red-700 transition flex items-center justify-center gap-3 shadow-lg shadow-red-900/20">
+                      {managementLoading ? 'Commencing Wipe...' : 'Permanently Shred Account'}
+                   </button>
+                   <button type="button" onClick={() => setShowDeleteAccountModal(false)} className="w-full text-zinc-600 text-[10px] uppercase tracking-widest hover:text-white transition py-2">Return to Safety</button>
+                </form>
+             </motion.div>
           </div>
         )}
       </AnimatePresence>

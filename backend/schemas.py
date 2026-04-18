@@ -27,6 +27,16 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UserUpdateEmail(BaseModel):
+    new_email: EmailStr
+
+class UserUpdatePassword(BaseModel):
+    current_password: str
+    new_password: str
+
+class UserDelete(BaseModel):
+    password: str
+
 # Schema for the Login Token
 class Token(BaseModel):
     access_token: Optional[str] = None
