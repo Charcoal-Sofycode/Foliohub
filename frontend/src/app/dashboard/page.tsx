@@ -1017,8 +1017,8 @@ function DashboardContent() {
                                 </div>
                              </div>
                              <form onSubmit={handleUpdateEmail} className="grid grid-cols-1 gap-4">
-                                <input name="newEmail" type="email" placeholder="new-identity@studio.com" required className="flex-1 bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm text-white font-light outline-none transition-colors" />
-                                <button type="submit" disabled={managementLoading} className="w-full sm:w-auto px-6 py-2 border border-zinc-700 text-white text-[10px] uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Update Identity</button>
+                                <input name="newEmail" type="email" placeholder="new-identity@studio.com" required className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm text-white font-light outline-none transition-colors" />
+                                <button type="submit" disabled={managementLoading} className="w-full py-3 bg-zinc-900 border border-zinc-800 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-white hover:text-black transition">Update Identity</button>
                              </form>
                           </div>
 
