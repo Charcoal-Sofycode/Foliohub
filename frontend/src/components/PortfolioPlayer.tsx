@@ -186,14 +186,24 @@ export default function PortfolioPlayer({
                     <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">We are preparing a web-optimized stream for this masterwork.</p>
                   </div>
                 ) : (
-                  <video
-                    src={selectedQuality === '4K Lossless' ? url : (optimizedUrl || url)}
-                    className="w-full h-full object-contain"
-                    autoPlay
-                    controls
-                    controlsList="nodownload"
-                    playsInline
-                  />
+                  <div className="relative w-full h-full group bg-black">
+                    {/* SECURITY SHIELD: An invisible overlay that prevents right-clicking directly on the video */}
+                    <div 
+                      className="absolute inset-0 z-20" 
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
+
+                    <video
+                      src={selectedQuality === '4K Lossless' ? url : (optimizedUrl || url)}
+                      className="w-full h-full object-contain"
+                      autoPlay
+                      controls
+                      controlsList="nodownload noplaybackrate"
+                      disablePictureInPicture
+                      playsInline
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
+                  </div>
                 )}
              </motion.div>
           </motion.div>

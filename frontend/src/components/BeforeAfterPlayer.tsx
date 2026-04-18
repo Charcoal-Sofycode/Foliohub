@@ -254,6 +254,9 @@ export default function BeforeAfterPlayer({
           onError={handleError}
           preload="auto"
           className="w-full h-full object-cover"
+          controlsList="nodownload"
+          disablePictureInPicture
+          onContextMenu={(e) => e.preventDefault()}
         />
       </div>
 
@@ -271,8 +274,17 @@ export default function BeforeAfterPlayer({
           onError={handleError}
           preload="auto"
           className="w-full h-full object-cover"
+          controlsList="nodownload"
+          disablePictureInPicture
+          onContextMenu={(e) => e.preventDefault()}
         />
       </div>
+
+      {/* SECURITY SHIELD: Blocks right-clicking on either layer */}
+      <div 
+        className="absolute inset-0 z-30 pointer-events-none" 
+        onContextMenu={(e) => e.preventDefault()}
+      />
 
       {/* Interactive Slider Bar */}
       <div 
