@@ -1055,13 +1055,14 @@ function DashboardContent() {
                             </div>
                             <p className="text-brand text-sm font-mono tracking-wide mb-4">{lead.email}</p>
                             <p className="text-zinc-400 font-light leading-relaxed max-w-2xl">{lead.project_details}</p>
-
                             <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest mt-6">Received — {new Date(lead.created_at).toLocaleDateString()} {new Date(lead.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                           </div>
+                          
                           <div className="flex gap-4">
                              <a href={`mailto:${lead.email}`} className="px-6 py-3 bg-white text-black text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition">
                                Reply
                              </a>
+
                              {!lead.is_read && (
                                 <button 
                                   onClick={async () => {
@@ -1074,20 +1075,22 @@ function DashboardContent() {
                                   Archive
                                 </button>
                              )}
-                              <button 
-                                onClick={() => handleReportInquiry(lead.id)}
-                                className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-red-400 hover:border-red-400/30 transition group"
-                                title="Report Spam"
-                              >
-                                <AlertCircle className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteInquiry(lead.id)}
-                                className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-white hover:bg-red-500/10 transition"
-                                title="Delete Lead"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+
+                             <button 
+                               onClick={() => handleReportInquiry(lead.id)}
+                               className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-red-400 hover:border-red-400/30 transition group"
+                               title="Report Spam"
+                             >
+                               <AlertCircle className="w-4 h-4" />
+                             </button>
+
+                             <button 
+                               onClick={() => handleDeleteInquiry(lead.id)}
+                               className="w-12 h-12 flex items-center justify-center border border-zinc-900 text-zinc-700 hover:text-white hover:bg-red-500/10 transition"
+                               title="Delete Lead"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
                           </div>
                         </div>
                       ))}
@@ -1095,7 +1098,6 @@ function DashboardContent() {
                   )}
                 </motion.div>
               )}
-
 
             </div>
           </main>
