@@ -21,7 +21,7 @@ class User(Base):
     is_2fa_enabled = Column(Boolean, default=False)
     two_factor_code = Column(String, nullable=True)
     # Relationships
-    portfolio = relationship("Portfolio", back_populates="owner", uselist=False)
+    portfolio = relationship("Portfolio", back_populates="owner", uselist=False, cascade="all, delete-orphan")
 
 class Portfolio(Base):
     __tablename__ = "portfolios"

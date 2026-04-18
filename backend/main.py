@@ -203,39 +203,44 @@ def delete_user_account(data: schemas.UserDelete, db: Session = Depends(get_db),
     
     portfolio = current_user.portfolio
     if portfolio:
-        for project in portfolio.projects:
-            if project.media_url: keys_to_delete.append(project.media_url)
-            if project.raw_media_url: keys_to_delete.append(project.raw_media_url)
-            if project.optimized_url: keys_to_delete.append(project.optimized_url)
-            if project.thumbnail_url: keys_to_delete.append(project.thumbnail_url)
-            
-            # Story media
-            if project.story:
-                story = project.story
-                stages = [
-                    story.brief_media, story.storyboard_media, 
-                    story.rough_cut_media, story.final_media
-                ]
-                for stage in stages:
-                    if stage:
-                        for item in stage:
-                            if isinstance(item, dict) and item.get('key'):
-                                keys_to_delete.append(item['key'])
-                
-                # Revision data
-                if story.revisions_data:
-                    for round_item in story.revisions_data:
-                        for m in round_item.get('media', []):
-                            if m.get('key'): keys_to_delete.append(m['key'])
-
-    # 3. Cleanse S3
-    for key in keys_to_delete:
         try:
-            s3_utils.delete_file(key)
-        except:
-            pass # Continue if one file fails
+            for project in portfolio.projects:
+                if project.media_url: keys_to_delete.append(project.media_url)
+                if project.raw_media_url: keys_to_delete.append(project.raw_media_url)
+                if project.optimized_url: keys_to_delete.append(project.optimized_url)
+                if project.thumbnail_url: keys_to_delete.append(project.thumbnail_url)
+                
+                # Story media sanity checks
+                if project.story:
+                    story = project.story
+                    # Stages media
+                    for stage_media in [story.brief_media, story.storyboard_media, story.rough_cut_media, story.final_media]:
+                        if isinstance(stage_media, list):
+                            for item in stage_media:
+                                if isinstance(item, dict) and item.get('key'):
+                                    keys_to_delete.append(item['key'])
+                    
+                    # Revision media
+                    if isinstance(story.revisions_data, list):
+                        for round_item in story.revisions_data:
+                            if isinstance(round_item, dict) and round_item.get('media'):
+                                for m in round_item['media']:
+                                    if isinstance(m, dict) and m.get('key'):
+                                        keys_to_delete.append(m['key'])
+        except Exception as e:
+            print(f"Key Collection Warning: {e}")
 
-    # 4. Wipe Database entries
+    # 3. Cleanse S3 (Scrubbing AWS)
+    # Remove duplicates
+    unique_keys = list(set(keys_to_delete))
+    for key in unique_keys:
+        if key:
+            try:
+                s3_utils.delete_file(key)
+            except Exception as e:
+                print(f"S3 Deletion Skip: {key} - {e}")
+
+    # 4. Wipe Database entries (Atomic Cascade)
     # (Cascading deletes if configured in models, otherwise manual)
     db.delete(current_user)
     db.commit()
