@@ -165,17 +165,21 @@ function DashboardContent() {
 
     console.log("DEBUG: Processing detected. Starting background sync...");
     
+    let pollCount = 0;
+    const MAX_POLLS = 40; // Safety cap: ~10 minutes at 15s interval
+
     const pollInterval = setInterval(async () => {
+      pollCount++;
       try {
         const res = await api.get('/portfolios/me');
-        // Check if we still need to poll based on the NEW data
+        // Check if we still need to poll — 'completed' and 'failed' are both terminal
         const stillWorking = res.data.projects?.some((p: any) => 
           p.transcoding_status === 'pending' || p.transcoding_status === 'processing'
         );
 
         setPortfolio(res.data);
 
-        if (!stillWorking) {
+        if (!stillWorking || pollCount >= MAX_POLLS) {
           console.log("DEBUG: All assets finalized. Polling terminated.");
           clearInterval(pollInterval);
         }
@@ -185,7 +189,14 @@ function DashboardContent() {
     }, 15000);
 
     return () => clearInterval(pollInterval);
-  }, [portfolio?.projects]); // Dependency on projects array allows detecting new uploads and status changes
+  // Use a stable derived key so we only restart when the set of in-progress IDs changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    portfolio?.projects
+      ?.filter((p: any) => p.transcoding_status === 'pending' || p.transcoding_status === 'processing')
+      ?.map((p: any) => p.id)
+      ?.join(',') ?? ''
+  ]);
 
 
   const fetchPortfolio = async () => {

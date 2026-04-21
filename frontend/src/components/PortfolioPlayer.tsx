@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Play, Volume2, VolumeX, X, Settings } from 'lucide-react';
 
@@ -23,13 +23,8 @@ export default function PortfolioPlayer({
   // Source priority: Optimized > URL
   const activeUrl = (optimizedUrl && transcodingStatus === 'completed') ? optimizedUrl : url;
   const isProcessing = transcodingStatus === 'processing' || transcodingStatus === 'pending';
+  const hasFailed = transcodingStatus === 'failed';
 
-  // Debug logging to help identify why overlay might persist
-  useEffect(() => {
-    if (transcodingStatus === 'completed') {
-      console.log(`DEBUG: Project "${title}" optimization complete. Overlay should hide.`);
-    }
-  }, [transcodingStatus, title]);
 
   const isHoveredRef = useRef(false);
 
@@ -84,6 +79,13 @@ export default function PortfolioPlayer({
             <div className="w-5 h-5 border-2 border-zinc-800 border-t-white rounded-full animate-spin mb-3" />
             <p className="text-[10px] uppercase tracking-[0.3em] text-white font-bold mb-1">Optimizing Studio Master</p>
             <p className="text-[9px] text-zinc-500 font-mono tracking-widest uppercase">Preparing high-performance version...</p>
+          </div>
+        )}
+
+        {/* Failed optimization — silent badge, video still plays */}
+        {hasFailed && (
+          <div className="absolute top-3 right-3 bg-amber-500/10 border border-amber-500/20 rounded-sm px-2 py-1 pointer-events-none">
+            <p className="text-[8px] uppercase tracking-widest text-amber-400/70 font-mono">Original Quality</p>
           </div>
         )}
         

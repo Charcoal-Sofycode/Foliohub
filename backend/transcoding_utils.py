@@ -8,6 +8,11 @@ import s3_utils
 import tempfile
 import requests
 
+# Maximum time (seconds) allowed for FFmpeg to complete.
+# Render free tier aggressively kills long processes, so we impose our own cap.
+FFMPEG_TIMEOUT_SECONDS = 480  # 8 minutes
+
+
 def transcode_video(project_id: int):
     """
     Background task to optimize high-bitrate video for web.
@@ -37,7 +42,7 @@ def transcode_video(project_id: int):
         output_path = os.path.join(tmp_dir, "optimized.mp4")
 
         print(f"DEBUG: Downloading {source_url} for transcoding...")
-        with requests.get(download_url, stream=True) as r:
+        with requests.get(download_url, stream=True, timeout=300) as r:
             with open(input_path, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
 
@@ -59,7 +64,12 @@ def transcode_video(project_id: int):
         ]
 
         
-        process = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+        process = subprocess.run(
+            ffmpeg_cmd,
+            capture_output=True,
+            text=True,
+            timeout=FFMPEG_TIMEOUT_SECONDS  # Hard cap to prevent zombie processes
+        )
         if process.returncode != 0:
             raise Exception(f"FFmpeg failed: {process.stderr}")
 
@@ -77,19 +87,53 @@ def transcode_video(project_id: int):
         db.commit()
         print(f"SUCCESS: Project {project_id} transcoding complete.")
 
+    except subprocess.TimeoutExpired:
+        print(f"TRANSCODING TIMEOUT for Project {project_id}: FFmpeg exceeded {FFMPEG_TIMEOUT_SECONDS}s limit.")
+        _mark_transcoding_failed(project_id, db)
+
     except Exception as e:
         print(f"TRANSCODING ERROR for Project {project_id}: {e}")
-        # Re-fetch project to ensure we have a fresh state for updating failure
-        try:
-            p_fail = db.query(models.Project).filter(models.Project.id == project_id).first()
-            if p_fail:
-                p_fail.transcoding_status = "failed"
-                db.commit()
-        except:
-            pass
+        _mark_transcoding_failed(project_id, db)
     
     finally:
-        # Cleanup
+        # Cleanup temp files regardless of outcome
         if os.path.exists(tmp_dir):
             shutil.rmtree(tmp_dir)
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def _mark_transcoding_failed(project_id: int, db):
+    """
+    Robustly marks a project's transcoding as failed.
+    Uses a fresh DB session if the primary one is in a broken state.
+    """
+    # Try with the existing session first
+    try:
+        p = db.query(models.Project).filter(models.Project.id == project_id).first()
+        if p:
+            p.transcoding_status = "failed"
+            db.commit()
+            return
+    except Exception:
+        pass
+
+    # Fallback: open a brand-new session
+    fresh_db = None
+    try:
+        fresh_db = SessionLocal()
+        p = fresh_db.query(models.Project).filter(models.Project.id == project_id).first()
+        if p:
+            p.transcoding_status = "failed"
+            fresh_db.commit()
+    except Exception as e2:
+        print(f"CRITICAL: Could not mark project {project_id} as failed: {e2}")
+    finally:
+        if fresh_db:
+            try:
+                fresh_db.close()
+            except Exception:
+                pass
+

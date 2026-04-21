@@ -34,6 +34,17 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
     setActiveUploads(prev => prev.map(u => u.id === id ? { ...u, ...delta } : u));
   };
 
+  // Define clearUpload first so the ref below is available immediately
+  const clearUpload = useCallback((id: string) => {
+    uploadsRef.current[id] = false;
+    setActiveUploads(prev => prev.filter(u => u.id !== id));
+  }, []);
+
+  // Keep a stable ref so setTimeout callbacks inside startMultipartUpload always
+  // call the latest clearUpload, even with an empty dependency array.
+  const clearUploadRef = useRef(clearUpload);
+  clearUploadRef.current = clearUpload;
+
   const startMultipartUpload = useCallback(async (file: File, onComplete: (url: string, key: string) => void) => {
     const uploadIdInternal = Math.random().toString(36).substring(7);
     const newUpload: UploadStatus = {
@@ -116,6 +127,9 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
 
       updateStatus(uploadIdInternal, { status: 'completed', progress: 100 });
       onComplete(file_url, object_key);
+
+      // Auto-dismiss the upload card after 4 seconds
+      setTimeout(() => clearUploadRef.current(uploadIdInternal), 4000);
       
       return { url: file_url, key: object_key };
 
@@ -125,14 +139,11 @@ export function UploadProvider({ children }: { children: React.ReactNode }) {
         status: 'failed', 
         error: 'Network failure. Please retry upload.' 
       });
+      // Auto-dismiss failed uploads after 8 seconds
+      setTimeout(() => clearUploadRef.current(uploadIdInternal), 8000);
       return { url: '', key: '' };
     }
   }, []);
-
-  const clearUpload = (id: string) => {
-    uploadsRef.current[id] = false;
-    setActiveUploads(prev => prev.filter(u => u.id !== id));
-  };
 
   return (
     <UploadContext.Provider value={{ activeUploads, startMultipartUpload, clearUpload }}>

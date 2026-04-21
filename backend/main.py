@@ -866,6 +866,41 @@ def _get_project_for_user(project_id: int, current_user: models.User, db: Sessio
     return project
 
 
+def _refresh_media_item_url(item: dict) -> dict:
+    """Regenerate a fresh presigned URL for a single media item using its stored key."""
+    key = item.get("key", "")
+    if not key:
+        return item
+    config = s3_utils.get_config()
+    full_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{key}"
+    fresh_url = s3_utils.get_presigned_url(full_url)
+    return {**item, "url": fresh_url}
+
+
+def _refresh_story_urls(story: models.ProjectStory) -> models.ProjectStory:
+    """
+    Walk all media lists in a story and replace stored (possibly-expired) presigned
+    URLs with fresh ones.  The `key` field is always the bare S3 object key and is
+    used as the authoritative source of truth.
+    """
+    try:
+        for field in ("brief_media", "storyboard_media", "rough_cut_media", "final_media"):
+            items = getattr(story, field) or []
+            if items:
+                setattr(story, field, [_refresh_media_item_url(it) for it in items])
+
+        rev_data = story.revisions_data or []
+        if rev_data:
+            refreshed_revs = []
+            for rev in rev_data:
+                refreshed_media = [_refresh_media_item_url(m) for m in rev.get("media", [])]
+                refreshed_revs.append({**rev, "media": refreshed_media})
+            story.revisions_data = refreshed_revs
+    except Exception as e:
+        print(f"Warning: Could not refresh story URLs: {e}")
+    return story
+
+
 @app.get("/projects/{project_id}/story", response_model=schemas.ProjectStoryResponse)
 def get_project_story(
     project_id: int,
@@ -889,7 +924,8 @@ def get_project_story(
         db.commit()
         db.refresh(story)
 
-    return story
+    # Always return fresh presigned URLs so the frontend can render media immediately
+    return _refresh_story_urls(story)
 
 
 @app.put("/projects/{project_id}/story", response_model=schemas.ProjectStoryResponse)
@@ -971,7 +1007,7 @@ async def upload_story_media(
         else:
             raise HTTPException(status_code=400, detail="Only image or video files are accepted.")
         
-        # Upload using the full S3 URL but we store relative keys in story media
+        # Upload to S3 — upload_file_to_s3 returns the full public URL
         file_url = s3_utils.upload_file_to_s3(file.file, file.filename)
         if not file_url:
             raise HTTPException(status_code=500, detail="Upload to cloud storage failed.")
@@ -980,7 +1016,10 @@ async def upload_story_media(
     if not s3_key:
         raise HTTPException(status_code=400, detail="Either a file or a direct_key must be provided.")
 
-    presigned = s3_utils.get_presigned_url(s3_key)
+    # Build the full URL from the key so get_presigned_url can sign it correctly
+    config = s3_utils.get_config()
+    full_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{s3_key}"
+    presigned = s3_utils.get_presigned_url(full_url)
     media_item = {"type": media_type, "url": presigned, "key": s3_key}
 
 
