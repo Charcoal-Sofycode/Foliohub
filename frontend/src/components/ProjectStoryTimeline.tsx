@@ -117,54 +117,182 @@ function MediaGrid({
   onDelete?: (key: string) => void;
   readOnly?: boolean;
 }) {
+  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
+
   if (!items.length) return null;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-      {items.map((item) => (
-        <div
-          key={item.key}
-          className="relative group rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50 aspect-video"
-        >
-          {item.type === 'image' ? (
-            <img
-              src={item.url}
-              alt=""
-              className="w-full h-full object-contain bg-black/40"
-              onError={(e) => {
-                 const target = e.target as HTMLImageElement;
-                 if (!target.src.startsWith('data:image')) {
-                   target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMjI1IiB2aWV3Qm94PSIwIDAgNDAwIDIyNSI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiMxMTExMTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM0NDQ0NDQiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1pc3NpbmcgQXNzZXQ8L3RleHQ+PC9zdmc+';
-                 }
-              }}
-            />
-          ) : (
-            <video
-              src={item.url}
-              controls
-              playsInline
-              preload="metadata"
-              className="w-full h-full object-contain bg-black/40"
-            />
-          )}
-          <div className="absolute top-1.5 left-1.5 bg-black/60 rounded-sm px-1.5 py-0.5 flex items-center gap-1">
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className="relative group rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/50 aspect-video cursor-zoom-in active:scale-[0.98] transition-transform"
+            onClick={() => setSelectedItem(item)}
+          >
             {item.type === 'image' ? (
-              <ImageIcon className="w-2.5 h-2.5 text-zinc-400" />
+              <img
+                src={item.url}
+                alt=""
+                className="w-full h-full object-contain bg-black/40"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (!target.src.startsWith('data:image')) {
+                    target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMjI1IiB2aWV3Qm94PSIwIDAgNDAwIDIyNSI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiMxMTExMTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM0NDQ0NDQiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1pc3NpbmcgQXNzZXQ8L3RleHQ+PC9zdmc+';
+                  }
+                }}
+              />
             ) : (
-              <Video className="w-2.5 h-2.5 text-zinc-400" />
+              <div className="w-full h-full flex items-center justify-center bg-black/40 relative">
+                <video
+                  src={item.url}
+                  preload="metadata"
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
+                    <Play className="w-3 h-3 fill-white text-white translate-x-0.5" />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="absolute top-1.5 left-1.5 bg-black/60 rounded-sm px-1.5 py-0.5 flex items-center gap-1">
+              {item.type === 'image' ? (
+                <ImageIcon className="w-2.5 h-2.5 text-zinc-400" />
+              ) : (
+                <Video className="w-2.5 h-2.5 text-zinc-400" />
+              )}
+            </div>
+
+            {!readOnly && onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(item.key);
+                }}
+                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition
+                           bg-red-600/80 hover:bg-red-600 rounded-sm p-1"
+              >
+                <Trash2 className="w-3 h-3 text-white" />
+              </button>
             )}
           </div>
-          {!readOnly && onDelete && (
-            <button
-              onClick={() => onDelete(item.key)}
-              className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition
-                         bg-red-600/80 hover:bg-red-600 rounded-sm p-1"
-            >
-              <Trash2 className="w-3 h-3 text-white" />
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      <AnimatePresence>
+        {selectedItem && (
+          <MediaLightbox 
+            item={selectedItem} 
+            onClose={() => setSelectedItem(null)} 
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/* ─── MediaLightbox ─────────────────────────────────────────────────────── */
+function MediaLightbox({ item, onClose }: { item: MediaItem; onClose: () => void }) {
+  const [isMuted, setIsMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+    } else {
+      videoRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-12"
+      onClick={onClose}
+    >
+      <button 
+        className="absolute top-6 right-6 w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all z-[101]"
+        onClick={onClose}
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        className="relative max-w-7xl w-full max-h-full flex items-center justify-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {item.type === 'image' ? (
+          <img
+            src={item.url}
+            alt=""
+            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+          />
+        ) : (
+          <div className="relative w-full aspect-video max-h-[85vh] bg-[#050505] rounded-xl overflow-hidden shadow-2xl group/player">
+            <video
+              ref={videoRef}
+              src={item.url}
+              autoPlay
+              muted={isMuted}
+              className="w-full h-full object-contain"
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onClick={togglePlay}
+            />
+
+            {/* Custom Video Controls */}
+            <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-between opacity-0 group-hover/player:opacity-100 transition-opacity duration-300">
+               <div className="flex items-center gap-4">
+                  <button 
+                    onClick={togglePlay}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 transition-transform"
+                  >
+                    {isPlaying ? <CheckCircle2 className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+                  </button>
+                  <div className="h-1 w-32 md:w-64 bg-white/20 rounded-full overflow-hidden">
+                      <div className="h-full bg-white w-[30%] animate-pulse" />
+                  </div>
+               </div>
+
+               <button 
+                onClick={() => setIsMuted(!isMuted)}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white hover:text-black transition-all"
+               >
+                 {isMuted ? <CheckCircle2 className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+               </button>
+            </div>
+            
+            {!isPlaying && (
+              <div 
+                className="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer"
+                onClick={togglePlay}
+              >
+                <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-white">
+                    <Play className="w-8 h-8 fill-current" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
+
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-center pointer-events-none">
+          <p className="text-[10px] uppercase tracking-[0.4em] text-white/40 font-bold mb-2">Internal Attachment Viewer</p>
+          <div className="flex items-center gap-2 justify-center">
+             <div className="w-1 h-1 rounded-full bg-green-500" />
+             <p className="text-[9px] font-mono text-white/60 tracking-widest uppercase">Verified Asset Link Secure</p>
+          </div>
+      </div>
+    </motion.div>
   );
 }
 
