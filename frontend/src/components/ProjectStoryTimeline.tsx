@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, FileText, Layout, Scissors, RefreshCw,
   CheckCircle2, Upload, X, Image as ImageIcon, Video,
-  Plus, Loader2, Trash2, Save
+  Plus, Loader2, Trash2, Save, Play, Settings
 } from 'lucide-react';
 import api from '@/lib/api';
 
