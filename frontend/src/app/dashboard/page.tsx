@@ -10,6 +10,7 @@ import FolioLogo from '@/components/FolioLogo';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
+import StyleFingerprint from '@/components/StyleFingerprint';
 import { useUpload } from '@/context/UploadContext';
 
 const ReactPlayer = dynamic(() => import('react-player'), { ssr: false });
@@ -39,7 +40,8 @@ import {
   Edit,
   Save,
   AlertCircle,
-  Plus
+  Plus,
+  Fingerprint
 } from 'lucide-react';
 export default function DashboardPage() {
   return (
@@ -721,8 +723,12 @@ function DashboardContent() {
                 <motion.div 
                   initial={{ opacity: 0 }} 
                   animate={{ opacity: 1 }} 
-                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 items-start"
+                  className="space-y-12"
                 >
+                  {/* Global Style Fingerprint */}
+                  <StyleFingerprint editable={true} />
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 items-start">
                   {portfolio.projects?.length > 0 ? (
                      portfolio.projects.map((project: any, i: number) => (
                       <motion.div 
@@ -812,6 +818,7 @@ function DashboardContent() {
                       </button>
                     </div>
                   )}
+                  </div>
                 </motion.div>
               )}
 

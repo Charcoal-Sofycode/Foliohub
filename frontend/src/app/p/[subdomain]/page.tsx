@@ -7,6 +7,7 @@ import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
 import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download } from 'lucide-react';
 import FolioLogo from '@/components/FolioLogo';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
+import StyleFingerprint from '@/components/StyleFingerprint';
 import { API_URL } from '@/lib/api';
 
 export default function PortfolioView({ params }: { params: Promise<{ subdomain: string }> }) {
@@ -190,6 +191,13 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             </div>
          </div>
       )}
+
+      {/* Style Fingerprint */}
+      <StyleFingerprint 
+        subdomain={resolvedParams.subdomain} 
+        portfolioTitle={portfolio.title}
+        fingerprintData={portfolio.style_fingerprint}
+      />
 
       {/* Projects Gallery */}
       <section className="px-4 sm:px-6 lg:px-12 py-16 sm:py-24">

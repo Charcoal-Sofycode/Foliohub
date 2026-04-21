@@ -52,6 +52,10 @@ class Portfolio(Base):
     youtube_url = Column(String, nullable=True)
     instagram_url = Column(String, nullable=True)
 
+    # Style Fingerprint — computed from uploaded videos
+    style_fingerprint = Column(JSON, nullable=True)
+    fingerprint_computed_at = Column(DateTime, nullable=True)
+
     # Relationships
     owner = relationship("User", back_populates="portfolio")
     projects = relationship("Project", back_populates="portfolio", cascade="all, delete-orphan")

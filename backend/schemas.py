@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator, Field
 from datetime import datetime
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 # Schema for when a user signs up
 class UserCreate(BaseModel):
@@ -176,6 +176,8 @@ class PortfolioResponse(BaseModel):
     skill_cutting: Optional[int] = 50
     skill_motion: Optional[int] = 50
     skill_color: Optional[int] = 50
+    style_fingerprint: Optional[Any] = None
+    fingerprint_computed_at: Optional[datetime] = None
     projects: list["ProjectResponse"] = []
 
 class ProjectUpdate(BaseModel):

@@ -1163,3 +1163,110 @@ def report_inquiry(inquiry_id: int, db: Session = Depends(get_db), current_user:
     return {"message": "Report submitted. Our team will investigate. Thank you."}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# STYLE FINGERPRINT ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _run_fingerprint_background(portfolio_id: int):
+    """Background task: compute fingerprint from all published videos."""
+    from database import SessionLocal
+    import fingerprint_utils
+
+    db = SessionLocal()
+    try:
+        portfolio = db.query(models.Portfolio).filter(models.Portfolio.id == portfolio_id).first()
+        if not portfolio:
+            return
+
+        video_urls = []
+        for project in portfolio.projects:
+            if project.is_published and project.media_url:
+                try:
+                    signed = s3_utils.get_presigned_url(project.media_url)
+                    if signed:
+                        video_urls.append(signed)
+                except Exception:
+                    pass
+            if project.is_published and project.optimized_url:
+                try:
+                    signed = s3_utils.get_presigned_url(project.optimized_url)
+                    if signed:
+                        video_urls.append(signed)
+                except Exception:
+                    pass
+
+        if not video_urls:
+            return
+
+        fingerprint = fingerprint_utils.compute_fingerprint(video_urls)
+        if fingerprint:
+            portfolio.style_fingerprint = fingerprint
+            portfolio.fingerprint_computed_at = datetime.now(timezone.utc)
+            db.commit()
+            print(f"[fingerprint] Portfolio {portfolio_id} done: {fingerprint['style_tags']}")
+    except Exception as e:
+        print(f"[fingerprint] Error for portfolio {portfolio_id}: {e}")
+    finally:
+        db.close()
+
+
+@app.post("/portfolio/fingerprint/compute")
+def trigger_fingerprint_computation(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Trigger a style fingerprint computation for the current user's portfolio."""
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    published_videos = [p for p in portfolio.projects if p.is_published and p.media_url]
+    if not published_videos:
+        raise HTTPException(status_code=400, detail="No published videos to analyse. Upload at least one project first.")
+
+    background_tasks.add_task(_run_fingerprint_background, portfolio.id)
+    return {
+        "message": "Style fingerprint analysis initiated. This may take 30–90 seconds depending on your library.",
+        "videos_queued": len(published_videos)
+    }
+
+
+@app.get("/portfolio/fingerprint")
+def get_my_fingerprint(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Retrieve the current user's style fingerprint."""
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    if not portfolio.style_fingerprint:
+        return {"fingerprint": None, "computed_at": None, "message": "No fingerprint computed yet."}
+
+    return {
+        "fingerprint": portfolio.style_fingerprint,
+        "computed_at": portfolio.fingerprint_computed_at,
+        "portfolio_title": portfolio.title,
+    }
+
+
+@app.get("/portfolios/fingerprint/{subdomain}")
+def get_public_fingerprint(subdomain: str, db: Session = Depends(get_db)):
+    """Public endpoint — return the style fingerprint for a portfolio page."""
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+
+    if not portfolio.style_fingerprint:
+        return {"fingerprint": None}
+
+    return {
+        "fingerprint": portfolio.style_fingerprint,
+        "computed_at": portfolio.fingerprint_computed_at,
+        "portfolio_title": portfolio.title,
+    }
+
+
+
