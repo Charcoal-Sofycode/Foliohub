@@ -721,7 +721,7 @@ function DashboardContent() {
                 <motion.div 
                   initial={{ opacity: 0 }} 
                   animate={{ opacity: 1 }} 
-                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8"
+                  className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 items-start"
                 >
                   {portfolio.projects?.length > 0 ? (
                      portfolio.projects.map((project: any, i: number) => (
