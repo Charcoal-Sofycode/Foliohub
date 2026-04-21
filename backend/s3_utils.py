@@ -57,15 +57,25 @@ def upload_file_to_s3(file_obj, original_filename: str):
         return None
 
 def get_presigned_url(file_url: str, expiration=3600):
-    if not file_url or "amazonaws.com" not in file_url:
+    """
+    Generates a presigned URL for an object. Accepts either a full S3 URL or a bare S3 key.
+    """
+    if not file_url:
         return file_url
     
     try:
         s3_client = get_s3_client()
         config = get_config()
         
-        # Extract object key from the full URL
-        object_name = file_url.split(".amazonaws.com/")[-1]
+        # Determine the object key. 
+        # If it's a full URL, extract the key part. If it's already a key, use it.
+        if "amazonaws.com" in file_url:
+            object_name = file_url.split(".amazonaws.com/")[-1]
+            # Strip query parameters if present (legacy cleanup)
+            if "?" in object_name:
+                object_name = object_name.split("?")[0]
+        else:
+            object_name = file_url
         
         response = s3_client.generate_presigned_url('get_object',
                                                     Params={'Bucket': config["bucket"],
@@ -103,6 +113,7 @@ def generate_presigned_post(file_name: str, file_type: str, expiration=3600):
     except Exception as e:
         print(f"Error generating presigned post: {e}")
         return None
+
 # --- RESUMABLE MULTIPART UPLOAD LOGIC ---
 
 def initiate_multipart_upload(file_name: str, file_type: str):
@@ -166,4 +177,3 @@ def complete_multipart_upload(object_key: str, upload_id: str, parts: list):
     except Exception as e:
         print(f"S3 Multipart Completion Error: {e}")
         return False
-

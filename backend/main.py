@@ -956,7 +956,7 @@ def update_project_story(
     story.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(story)
-    return story
+    return _refresh_story_urls(story)
 
 
 @app.post("/projects/{project_id}/story/upload")
