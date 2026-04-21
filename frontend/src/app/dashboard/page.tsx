@@ -589,7 +589,7 @@ function DashboardContent() {
                     <input 
                       type="text" 
                       placeholder="yourname"
-                      className="w-full py-4 pl-0 pr-4 sm:pr-40 bg-transparent border-b-2 border-zinc-800 focus:border-white outline-none transition-colors text-white font-medium text-lg placeholder-zinc-800"
+                      className="w-full py-4 pl-0 pr-4 sm:pr-40 bg-transparent border-b-2 border-zinc-800 focus:border-white outline-none transition-colors text-white font-medium text-lg placeholder-zinc-500"
                       value={subdomain}
                       onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                       required
@@ -1284,7 +1284,7 @@ function DashboardContent() {
                   <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Asset Title</label>
                   <input 
                     type="text" 
-                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-xl outline-none transition-colors text-white placeholder-zinc-800 font-light"
+                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-xl outline-none transition-colors text-white placeholder-zinc-500 font-medium"
                     value={uploadTitle}
                     onChange={(e) => setUploadTitle(e.target.value)}
                     required
@@ -1296,7 +1296,7 @@ function DashboardContent() {
                 <div className="space-y-1">
                   <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Metadata Description</label>
                   <textarea 
-                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors h-24 resize-none text-white placeholder-zinc-800 font-light"
+                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors h-24 resize-none text-white placeholder-zinc-500 font-medium"
                     value={uploadDesc}
                     onChange={(e) => setUploadDesc(e.target.value)}
                     disabled={isUploading}
@@ -1324,7 +1324,7 @@ function DashboardContent() {
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Your Role</label>
                     <input 
                       type="text" 
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white placeholder-zinc-800 font-light"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white placeholder-zinc-500 font-medium"
                       value={uploadRole}
                       onChange={(e) => setUploadRole(e.target.value)}
                       disabled={isUploading}
@@ -1335,7 +1335,7 @@ function DashboardContent() {
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Tools Used</label>
                     <input 
                       type="text" 
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white placeholder-zinc-800 font-light"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white placeholder-zinc-500 font-medium"
                       value={uploadTools}
                       onChange={(e) => setUploadTools(e.target.value)}
                       disabled={isUploading}
@@ -1347,7 +1347,7 @@ function DashboardContent() {
                    <div>
                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Proof of Work: Timeline Breakdown (Optional)</label>
                      <textarea 
-                       className="w-full mt-2 bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-sm outline-none transition-colors h-24 resize-none text-white placeholder-zinc-800 font-light"
+                       className="w-full mt-2 bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-sm outline-none transition-colors h-24 resize-none text-white placeholder-zinc-500 font-medium"
                        value={uploadTimeline}
                        onChange={(e) => setUploadTimeline(e.target.value)}
                        disabled={isUploading}

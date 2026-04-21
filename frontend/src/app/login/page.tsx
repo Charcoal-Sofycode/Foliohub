@@ -132,7 +132,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light"
+                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-500 font-normal"
                     placeholder="director@studio.com"
                   />
                 </div>
@@ -148,7 +148,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light tracking-widest pr-10"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-500 font-normal tracking-widest pr-10"
                       placeholder="••••••••"
                     />
                     <button
@@ -169,7 +169,7 @@ export default function LoginPage() {
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value)}
                   required
-                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-2xl outline-none transition-colors placeholder-zinc-700 tracking-[0.5em] font-mono text-center"
+                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-2xl outline-none transition-colors placeholder-zinc-500 tracking-[0.5em] font-mono text-center"
                   placeholder="000000"
                   maxLength={6}
                 />

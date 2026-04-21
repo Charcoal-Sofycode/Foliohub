@@ -460,8 +460,8 @@ function StagePanel({
               rows={3}
               placeholder={`Add ${stage.label.toLowerCase()} notes, context or references…`}
               className="w-full bg-zinc-900/40 border border-zinc-800 focus:border-zinc-600
-                         rounded-lg px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-700
-                         resize-none outline-none transition-colors font-light"
+                         rounded-lg px-3 py-2.5 text-sm text-zinc-200 placeholder-zinc-500
+                         resize-none outline-none transition-colors font-normal"
             />
             <div className="flex justify-end mt-1.5">
               <button

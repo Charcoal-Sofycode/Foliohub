@@ -152,7 +152,7 @@ export default function SignupPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light"
+                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-500 font-normal"
                   placeholder="director@studio.com"
                 />
               </div>
@@ -167,7 +167,7 @@ export default function SignupPage() {
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g,''))}
                   required
                   maxLength={6}
-                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-2xl outline-none transition-colors placeholder-zinc-700 tracking-[0.5em] font-mono text-center"
+                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-2xl outline-none transition-colors placeholder-zinc-500 tracking-[0.5em] font-mono text-center"
                   placeholder="000000"
                 />
               </div>
@@ -183,7 +183,7 @@ export default function SignupPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light tracking-widest pr-10"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-500 font-normal tracking-widest pr-10"
                       placeholder="••••••••"
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-0 bottom-3 text-zinc-600 hover:text-white transition-colors">
@@ -203,7 +203,7 @@ export default function SignupPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
-                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-700 font-light tracking-widest"
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg outline-none transition-colors placeholder-zinc-500 font-normal tracking-widest"
                       placeholder="••••••••"
                     />
                   </div>
