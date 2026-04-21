@@ -131,7 +131,10 @@ function MediaGrid({
               alt=""
               className="w-full h-full object-contain bg-black/40"
               onError={(e) => {
-                 (e.target as any).src = 'https://via.placeholder.com/400x225/111/444?text=Missing+Asset';
+                 const target = e.target as HTMLImageElement;
+                 if (!target.src.startsWith('data:image')) {
+                   target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMjI1IiB2aWV3Qm94PSIwIDAgNDAwIDIyNSI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSIyMjUiIGZpbGw9IiMxMTExMTEiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM0NDQ0NDQiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPk1pc3NpbmcgQXNzZXQ8L3RleHQ+PC9zdmc+';
+                 }
               }}
             />
           ) : (
