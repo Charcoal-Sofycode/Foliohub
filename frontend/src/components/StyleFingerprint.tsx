@@ -155,15 +155,37 @@ export default function StyleFingerprint({
     try {
       const { data } = await api.post('/portfolio/fingerprint/compute');
       setComputeMsg(`Analysing ${data.videos_queued} video${data.videos_queued !== 1 ? 's' : ''}…`);
-      // Poll every 8s for up to 2 mins
+      
       let attempts = 0;
       pollingRef.current = setInterval(async () => {
         attempts++;
-        await fetchFingerprint();
-        if (fingerprint || attempts >= 15) {
+        
+        try {
+          let res;
+          if (subdomain) {
+            const { data } = await api.get(`/portfolios/fingerprint/${subdomain}`);
+            res = data.fingerprint;
+          } else {
+            const { data } = await api.get('/portfolio/fingerprint');
+            res = data.fingerprint;
+          }
+
+          if (res) {
+            setFingerprint(res);
+            clearInterval(pollingRef.current!);
+            setIsComputing(false);
+            setComputeMsg('');
+            return;
+          }
+        } catch (e) {
+          console.error("Polling error:", e);
+        }
+
+        if (attempts >= 20) { // Max 160 seconds
           clearInterval(pollingRef.current!);
           setIsComputing(false);
           setComputeMsg('');
+          if (!fingerprint) setError('Analysis is taking longer than expected. Please refresh in a moment.');
         }
       }, 8000);
     } catch (err: any) {

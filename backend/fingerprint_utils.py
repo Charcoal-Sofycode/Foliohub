@@ -352,7 +352,7 @@ def compute_fingerprint(video_urls: list[str]) -> Optional[dict]:
     # Tags
     tags = _generate_tags(avg_shot_length, beat_sync_score, motion_energy, avg_saturation, silence_ratio)
 
-    return {
+    res = {
         "videos_analysed": videos_analysed,
         "total_duration": round(total_duration, 1),
         "avg_shot_length": avg_shot_length,
@@ -367,3 +367,6 @@ def compute_fingerprint(video_urls: list[str]) -> Optional[dict]:
         "cut_timeline": cut_timeline,
         "style_tags": tags,
     }
+    print(f"[fingerprint] Analysis complete for {videos_analysed} videos. Tags: {tags}")
+    return res
+
