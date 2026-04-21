@@ -38,7 +38,8 @@ import {
   Trash2,
   Edit,
   Save,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react';
 export default function DashboardPage() {
   return (
