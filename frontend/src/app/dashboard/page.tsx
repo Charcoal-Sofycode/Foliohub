@@ -553,6 +553,9 @@ function DashboardContent() {
                 playsInline 
                 className="w-full h-full object-cover opacity-20 filter grayscale"
                 src="https://www.w3schools.com/html/mov_bbb.mp4" 
+                onContextMenu={(e) => e.preventDefault()}
+                controlsList="nodownload"
+                disablePictureInPicture
               />
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/80 to-transparent z-10" />

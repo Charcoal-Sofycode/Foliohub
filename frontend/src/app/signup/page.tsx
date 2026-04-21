@@ -87,6 +87,9 @@ export default function SignupPage() {
             autoPlay loop muted playsInline 
             className="w-full h-full object-cover filter contrast-125 saturate-50 grayscale select-none pointer-events-none"
             src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/72de9afc-1b3c-4b2b-8efd-7a1fcb63d489.mp4" 
+            onContextMenu={(e) => e.preventDefault()}
+            controlsList="nodownload"
+            disablePictureInPicture
           />
         </div>
 

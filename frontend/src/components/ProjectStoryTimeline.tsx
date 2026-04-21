@@ -147,6 +147,9 @@ function MediaGrid({
                   src={item.url}
                   preload="metadata"
                   className="w-full h-full object-contain"
+                  onContextMenu={(e) => e.preventDefault()}
+                  controlsList="nodownload"
+                  disablePictureInPicture
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
                   <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center">
@@ -247,6 +250,9 @@ function MediaLightbox({ item, onClose }: { item: MediaItem; onClose: () => void
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onClick={togglePlay}
+              onContextMenu={(e) => e.preventDefault()}
+              controlsList="nodownload"
+              disablePictureInPicture
             />
 
             {/* Custom Video Controls */}

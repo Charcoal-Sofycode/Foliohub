@@ -70,6 +70,9 @@ export default function LoginPage() {
             playsInline 
             className="w-full h-full object-cover filter contrast-125 saturate-50 grayscale select-none pointer-events-none"
             src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/0570cdb5-dc7e-4c1b-9974-550b61f1912e.mp4" 
+            onContextMenu={(e) => e.preventDefault()}
+            controlsList="nodownload"
+            disablePictureInPicture
           />
         </div>
 

@@ -82,7 +82,14 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             <div className="absolute inset-0 z-0">
                {/* Embed youtube or video. If it's a raw video url: */}
                {portfolio.showreel_url.endsWith('.mp4') || portfolio.showreel_url.endsWith('.webm') ? (
-                  <video src={portfolio.showreel_url} autoPlay loop muted className="w-full h-full object-cover opacity-70" />
+                  <video 
+                     src={portfolio.showreel_url} 
+                     autoPlay loop muted playsInline 
+                     className="w-full h-full object-cover opacity-70" 
+                     onContextMenu={(e) => e.preventDefault()}
+                     controlsList="nodownload"
+                     disablePictureInPicture
+                  />
                ) : (
                   <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
                     <p className="text-zinc-600 font-mono text-xs uppercase tracking-widest">Showreel Connected: {portfolio.showreel_url}</p>
