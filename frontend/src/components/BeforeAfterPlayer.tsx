@@ -50,9 +50,9 @@ export default function BeforeAfterPlayer({
   const syncVideos = useCallback(() => {
     const leader = finalVideoRef.current; // Final Master is the leader
     const follower = rawVideoRef.current; 
-    if (!leader || !follower) return;
+    if (!leader || !follower || isSeeking) return;
     
-    // Playback state sync with precision correction
+    // Playback state sync
     if (leader.paused !== follower.paused) {
       if (leader.paused) follower.pause();
       else follower.play().catch(() => {});
@@ -60,29 +60,33 @@ export default function BeforeAfterPlayer({
 
     const drift = Math.abs(leader.currentTime - follower.currentTime);
     
-    // Only force sync if the drift is significant (> 0.08s) or if the leader just jumped (seek/loop)
-    // Small drifts are normal and forcing sync every frame causes stuttering
-    if (drift > 0.08 || leader.seeking || (leader.currentTime < 0.1 && follower.currentTime > 1)) {
+    // SYNC STRATEGY:
+    // 1. If drift is extreme (> 0.3s) or seeking/looping, force hard seek
+    // 2. If drift is moderate (0.04s - 0.3s), adjust playback rate for smooth catch-up
+    // 3. If drift is tiny (< 0.04s), do nothing to allow natural playback
+    
+    if (drift > 0.3 || leader.seeking || (leader.currentTime < 0.2 && follower.currentTime > 1)) {
       follower.currentTime = leader.currentTime;
-    }
-
-    // Update progress state
-    if (!isSeeking) {
-      setCurrentTime(leader.currentTime);
-    }
-
-    // Handle Looping synchronization
-    if (leader.currentTime < follower.currentTime - 1) {
-        follower.currentTime = leader.currentTime;
-    }
-
-    // Ensure playback speed matches exactly
-    if (follower.playbackRate !== leader.playbackRate) {
+      follower.playbackRate = leader.playbackRate;
+    } else if (drift > 0.04) {
+      // Smoothly adjust speed to catch up (±10% speed)
+      const speedAdjust = leader.currentTime > follower.currentTime ? 1.1 : 0.9;
+      follower.playbackRate = leader.playbackRate * speedAdjust;
+    } else {
+      // Revert to normal speed when in sync
+      if (follower.playbackRate !== leader.playbackRate) {
         follower.playbackRate = leader.playbackRate;
+      }
+    }
+
+    // Update progress state (Throttled to avoid excessive re-renders)
+    // Only update state if it changed by more than 0.1s or for very short videos
+    if (Math.abs(leader.currentTime - currentTime) > 0.1 || duration < 5) {
+        setCurrentTime(leader.currentTime);
     }
 
     syncIntervalRef.current = requestAnimationFrame(syncVideos);
-  }, [isSeeking]);
+  }, [isSeeking, currentTime, duration]);
 
   useEffect(() => {
     if (isPlaying && isReady) {
@@ -140,6 +144,11 @@ export default function BeforeAfterPlayer({
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const percentage = (x / rect.width) * 100;
+    
+    // 1. Direct DOM update for maximum performance (visuals)
+    containerRef.current.style.setProperty('--slider-pos', `${percentage}%`);
+    
+    // 2. State update for non-visual logic (audio, labels) - still needed but React will batch it
     setSliderPosition(percentage);
   }, []);
 
@@ -223,6 +232,7 @@ export default function BeforeAfterPlayer({
     <div 
       ref={containerRef}
       className={`relative w-full h-full bg-[#030303] overflow-hidden select-none group touch-none ${className} ${expanded ? 'rounded-none' : 'rounded-xl cursor-zoom-in border border-white/5'}`}
+      style={{ '--slider-pos': `${sliderPosition}%` } as any}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={!expanded ? openFullscreen : undefined}
@@ -315,7 +325,7 @@ export default function BeforeAfterPlayer({
 
       <div 
         className="absolute inset-0 z-10"
-        style={{ clipPath: `inset(0 0 0 ${sliderPosition}%)` }}
+        style={{ clipPath: 'inset(0 0 0 var(--slider-pos))' }}
       >
         <video
           ref={finalVideoRef}
@@ -343,7 +353,7 @@ export default function BeforeAfterPlayer({
       {/* Interactive Slider Bar */}
       <div 
         className="absolute inset-y-0 z-50 w-1 bg-white cursor-ew-resize group/slider flex items-center justify-center touch-none"
-        style={{ left: `${sliderPosition}%` }}
+        style={{ left: 'var(--slider-pos)' }}
         onPointerDown={onPointerDown}
       >
         <div className="relative w-10 h-10 bg-white rounded-full shadow-[0_0_30px_rgba(0,0,0,0.5)] flex items-center justify-center transition-transform group-hover/slider:scale-110 active:scale-90">
