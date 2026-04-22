@@ -1536,6 +1536,13 @@ function DashboardContent() {
                             <>
                               <p className="text-sm font-medium text-white max-w-[200px] truncate">{selectedFile.name}</p>
                               <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">Selected</p>
+                              <button 
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFile(null); }}
+                                className="absolute top-2 right-2 p-1.5 bg-zinc-800/80 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition z-20"
+                                title="Remove file"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
                             </>
                           ) : (
                             <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Drag & Drop or Click to Upload</p>
@@ -1580,6 +1587,13 @@ function DashboardContent() {
                               <>
                                 <p className="text-sm font-medium text-white max-w-[200px] truncate">{uploadThumbnailFile.name}</p>
                                 <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">New Thumbnail</p>
+                                <button 
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUploadThumbnailFile(null); }}
+                                  className="absolute top-2 right-2 p-1.5 bg-zinc-800/80 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition z-20"
+                                  title="Remove thumbnail"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
                               </>
                             ) : (
                               <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Upload Poster Image</p>
@@ -1628,6 +1642,13 @@ function DashboardContent() {
                             <>
                               <p className="text-sm font-medium text-white max-w-sm text-center truncate">{uploadRawFile.name}</p>
                               <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">New Raw Selected</p>
+                              <button 
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUploadRawFile(null); }}
+                                className="absolute top-2 right-2 p-1.5 bg-zinc-800/80 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition z-20"
+                                title="Remove raw footage"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
                             </>
                           ) : (
                             <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Attach original video for before/after comparison</p>
