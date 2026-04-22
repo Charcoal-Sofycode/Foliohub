@@ -37,8 +37,6 @@ import {
   Shield,
   ShieldAlert,
   Sparkles,
-  Mail,
-  Trash2,
   Edit,
   Save,
   AlertCircle,
