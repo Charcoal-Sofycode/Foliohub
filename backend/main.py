@@ -573,9 +573,11 @@ def create_project(
     file: UploadFile = File(None), # Made optional
     raw_file: UploadFile = File(None),
     project_file: UploadFile = File(None),
+    thumbnail: UploadFile = File(None),
     media_key: str = Form(None), # New: Direct S3 keys
     raw_media_key: str = Form(None),
     project_file_key: str = Form(None),
+    thumbnail_key: str = Form(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -622,6 +624,13 @@ def create_project(
         raw_media_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{raw_media_key}"
     elif raw_file:
         raw_media_url = s3_utils.upload_file_to_s3(raw_file.file, raw_file.filename)
+        
+    thumbnail_url = None
+    if thumbnail_key and thumbnail_key != "undefined":
+        config = s3_utils.get_config()
+        thumbnail_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{thumbnail_key}"
+    elif thumbnail:
+        thumbnail_url = s3_utils.upload_file_to_s3(thumbnail.file, thumbnail.filename)
 
     is_verified = False
     if project_file_url and timeline_breakdown:
@@ -638,6 +647,7 @@ def create_project(
         category=category,
         media_url=file_url,
         raw_media_url=raw_media_url,
+        thumbnail_url=thumbnail_url,
         timeline_breakdown=timeline_breakdown,
         project_file_url=project_file_url,
         is_verified=is_verified

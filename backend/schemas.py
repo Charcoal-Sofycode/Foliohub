@@ -187,6 +187,7 @@ class ProjectUpdate(BaseModel):
     tools_used: Optional[str] = None
     category: Optional[str] = None
     timeline_breakdown: Optional[str] = None
+    thumbnail_url: Optional[str] = None
 
 class ProjectResponse(BaseModel):
 
@@ -204,12 +205,13 @@ class ProjectResponse(BaseModel):
     media_url: Optional[str]
     raw_media_url: Optional[str] = None
     optimized_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     transcoding_status: str = "pending"
     created_at: datetime
     story: Optional[ProjectStoryResponse] = None
 
 
-    @field_validator("media_url", "raw_media_url", "optimized_url", mode="after")
+    @field_validator("media_url", "raw_media_url", "optimized_url", "thumbnail_url", mode="after")
     @classmethod
     def presign_url(cls, v):
         import s3_utils

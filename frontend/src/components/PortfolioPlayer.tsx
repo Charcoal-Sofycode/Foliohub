@@ -6,11 +6,13 @@ export default function PortfolioPlayer({
   url, 
   title, 
   optimizedUrl, 
+  thumbnailUrl,
   transcodingStatus 
 }: { 
   url: string, 
   title?: string, 
   optimizedUrl?: string, 
+  thumbnailUrl?: string,
   transcodingStatus?: string 
 }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -68,6 +70,7 @@ export default function PortfolioPlayer({
         <video
           ref={videoRef}
           src={activeUrl}
+          poster={thumbnailUrl}
           className={`w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${isProcessing ? 'opacity-30 grayscale' : ''}`}
           muted={isMuted}
           loop
@@ -213,6 +216,7 @@ export default function PortfolioPlayer({
                     <video
                       key={selectedQuality}
                       src={selectedQuality === '4K Lossless' ? url : (optimizedUrl || url)}
+                      poster={thumbnailUrl}
                       className="w-full h-full object-contain"
                       autoPlay
                       controls

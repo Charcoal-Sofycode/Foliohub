@@ -8,6 +8,7 @@ interface BeforeAfterPlayerProps {
   rawUrl: string;
   finalUrl: string;
   title: string;
+  thumbnailUrl?: string;
   className?: string;
   expanded?: boolean;
   beforeLabel?: string;
@@ -18,6 +19,7 @@ export default function BeforeAfterPlayer({
   rawUrl, 
   finalUrl, 
   title, 
+  thumbnailUrl,
   className = "", 
   expanded = false,
   beforeLabel = "Raw Footage",
@@ -255,6 +257,7 @@ export default function BeforeAfterPlayer({
         <video
           ref={rawVideoRef}
           src={rawUrl}
+          poster={thumbnailUrl}
           loop
           muted={isMuted}
           playsInline
@@ -275,6 +278,7 @@ export default function BeforeAfterPlayer({
         <video
           ref={finalVideoRef}
           src={finalUrl}
+          poster={thumbnailUrl}
           loop
           muted={isMuted}
           playsInline
@@ -400,6 +404,7 @@ export default function BeforeAfterPlayer({
                     rawUrl={rawUrl} 
                     finalUrl={finalUrl} 
                     title={title} 
+                    thumbnailUrl={thumbnailUrl}
                     expanded={true} 
                     beforeLabel={beforeLabel} 
                     afterLabel={afterLabel} 

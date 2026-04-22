@@ -98,6 +98,7 @@ function DashboardContent() {
   const [uploadTimeline, setUploadTimeline] = useState("");
   const [uploadProjectFile, setUploadProjectFile] = useState<File | null>(null);
   const [uploadRawFile, setUploadRawFile] = useState<File | null>(null);
+  const [uploadThumbnailFile, setUploadThumbnailFile] = useState<File | null>(null);
   
   // Edit State
   const [editingProject, setEditingProject] = useState<any>(null);
@@ -265,20 +266,38 @@ function DashboardContent() {
       let final_media_key = "";
       let final_raw_key = "";
       let final_project_key = "";
+      let final_thumbnail_key = "";
 
       // Start the chain
       // 1. Primary Video
       await startMultipartUpload(selectedFile, async (url, key) => {
         final_media_key = key;
         
-        // 2. Raw Video (if exists) - usually small or we handle in sequence
-        if (uploadRawFile) {
-           await startMultipartUpload(uploadRawFile, async (rawUrl, rawKey) => {
-              final_raw_key = rawKey;
-              finishProjectCreation(final_media_key, final_raw_key, final_project_key);
-           });
+        // 2. Thumbnail (if exists)
+        if (uploadThumbnailFile) {
+          await startMultipartUpload(uploadThumbnailFile, async (tUrl, tKey) => {
+            final_thumbnail_key = tKey;
+            
+            // 3. Raw Video (if exists)
+            if (uploadRawFile) {
+               await startMultipartUpload(uploadRawFile, async (rawUrl, rawKey) => {
+                  final_raw_key = rawKey;
+                  finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
+               });
+            } else {
+               finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
+            }
+          });
         } else {
-           finishProjectCreation(final_media_key, final_raw_key, final_project_key);
+          // 3. Raw Video (if exists)
+          if (uploadRawFile) {
+             await startMultipartUpload(uploadRawFile, async (rawUrl, rawKey) => {
+                final_raw_key = rawKey;
+                finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
+             });
+          } else {
+             finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
+          }
         }
       });
 
@@ -294,7 +313,7 @@ function DashboardContent() {
     }
   };
 
-  const finishProjectCreation = async (mKey: string, rKey: string, pKey: string) => {
+  const finishProjectCreation = async (mKey: string, rKey: string, pKey: string, tKey: string) => {
     try {
       const formData = new FormData();
       formData.append('title', uploadTitle);
@@ -304,6 +323,7 @@ function DashboardContent() {
       formData.append('media_key', mKey);
       if (rKey) formData.append('raw_media_key', rKey);
       if (pKey) formData.append('project_file_key', pKey);
+      if (tKey) formData.append('thumbnail_key', tKey);
       
       if (uploadRole) formData.append('role', uploadRole);
       if (uploadTools) formData.append('tools_used', uploadTools);
@@ -461,6 +481,7 @@ function DashboardContent() {
     setSelectedFile(null);
     setUploadProjectFile(null);
     setUploadRawFile(null);
+    setUploadThumbnailFile(null);
     setUploadProgress(0);
     setIsUploading(false);
   };
@@ -740,12 +761,18 @@ function DashboardContent() {
                       >
                         <div className="aspect-video bg-black relative overflow-hidden flex-shrink-0">
                           {project.raw_media_url && project.media_url ? (
-                            <BeforeAfterPlayer rawUrl={project.raw_media_url} finalUrl={project.media_url} title={project.title} />
+                            <BeforeAfterPlayer 
+                           rawUrl={project.raw_media_url} 
+                           finalUrl={project.media_url} 
+                           title={project.title} 
+                           thumbnailUrl={project.thumbnail_url}
+                        />
                           ) : project.media_url ? (
                             <PortfolioPlayer 
                               url={project.media_url} 
                               title={project.title}
                               optimizedUrl={project.optimized_url}
+                              thumbnailUrl={project.thumbnail_url}
                               transcodingStatus={project.transcoding_status}
                             />
                           ) : (
@@ -1412,6 +1439,34 @@ function DashboardContent() {
                               <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
                               <p className="text-xs font-bold text-white uppercase tracking-widest">Final Video</p>
                               <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">MP4/WEBM</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Custom Thumbnail <span className="text-zinc-600">(Static Cover)</span></label>
+                      <div className="relative group mt-2">
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                          onChange={(e) => setUploadThumbnailFile(e.target.files?.[0] || null)}
+                          disabled={isUploading}
+                        />
+                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${uploadThumbnailFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                          {uploadThumbnailFile ? (
+                            <>
+                              <CheckCircle2 className="w-5 h-5 text-white mb-2" />
+                              <p className="text-[11px] font-bold text-white max-w-[140px] truncate">{uploadThumbnailFile.name}</p>
+                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                            </>
+                          ) : (
+                            <>
+                              <Grid className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
+                              <p className="text-xs font-bold text-white uppercase tracking-widest">Poster Image</p>
+                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Optional</p>
                             </>
                           )}
                         </div>
