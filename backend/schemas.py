@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator, Field
 from datetime import datetime
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Union
 
 # Schema for when a user signs up
 class UserCreate(BaseModel):
@@ -188,6 +188,7 @@ class ProjectUpdate(BaseModel):
     category: Optional[str] = None
     timeline_breakdown: Optional[str] = None
     thumbnail_url: Optional[str] = None
+    project_file_url: Optional[str] = None
 
 class ProjectResponse(BaseModel):
 
@@ -200,7 +201,7 @@ class ProjectResponse(BaseModel):
     tools_used: Optional[str] = None
     category: Optional[str] = None
     timeline_breakdown: Optional[str] = None
-    project_file_url: Optional[str] = None
+    project_file_url: Optional[Union[str, list[str]]] = None
     is_verified: bool = False
     media_url: Optional[str]
     raw_media_url: Optional[str] = None
@@ -211,12 +212,31 @@ class ProjectResponse(BaseModel):
     story: Optional[ProjectStoryResponse] = None
 
 
-    @field_validator("media_url", "raw_media_url", "optimized_url", "thumbnail_url", mode="after")
+    @field_validator("media_url", "raw_media_url", "optimized_url", "thumbnail_url", "project_file_url", mode="after")
     @classmethod
     def presign_url(cls, v):
         import s3_utils
-        if v:
+        import json
+        if not v:
+            return v
+            
+        # Handle project_file_url which might be a JSON list of strings
+        if isinstance(v, str) and (v.startswith('[') and v.endswith(']')):
+            try:
+                urls = json.loads(v)
+                if isinstance(urls, list):
+                    return [s3_utils.get_presigned_url(url) for url in urls]
+            except:
+                pass
+                
+        # Handle regular string
+        if isinstance(v, str):
             return s3_utils.get_presigned_url(v)
+            
+        # Handle list (if already parsed or passed as list)
+        if isinstance(v, list):
+            return [s3_utils.get_presigned_url(url) for url in v]
+            
         return v
 
     class Config:

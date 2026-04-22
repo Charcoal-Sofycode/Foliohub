@@ -286,10 +286,28 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                         )}
 
                         {project.project_file_url && (
-                           <div className="pt-4 pb-2 border-zinc-900">
-                              <a href={project.project_file_url} target="_blank" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-white hover:text-black transition text-[10px] font-bold uppercase tracking-widest text-zinc-300 rounded-sm">
-                                <Download className="w-3.5 h-3.5" /> Download Project Proof
-                              </a>
+                           <div className="pt-4 pb-2 border-zinc-900 flex flex-wrap gap-3">
+                              {Array.isArray(project.project_file_url) ? (
+                                project.project_file_url.map((url: string, idx: number) => {
+                                  const fileName = url.split('/').pop()?.split('?')[0] || `Proof #${idx + 1}`;
+                                  return (
+                                    <a 
+                                      key={idx} 
+                                      href={url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-white hover:text-black transition text-[10px] font-bold uppercase tracking-widest text-zinc-300 rounded-sm border border-white/5"
+                                      title={decodeURIComponent(fileName)}
+                                    >
+                                      <Download className="w-3.5 h-3.5" /> {decodeURIComponent(fileName).length > 20 ? `Proof #${idx + 1}` : decodeURIComponent(fileName)}
+                                    </a>
+                                  );
+                                })
+                              ) : (
+                                <a href={project.project_file_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-white hover:text-black transition text-[10px] font-bold uppercase tracking-widest text-zinc-300 rounded-sm border border-white/5">
+                                  <Download className="w-3.5 h-3.5" /> Download Project Proof
+                                </a>
+                              )}
                            </div>
                         )}
                      </div>

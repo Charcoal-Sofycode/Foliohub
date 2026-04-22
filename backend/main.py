@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import secrets
 import random
 import re
+import json
 
 import s3_utils  # Import your new S3 logic
 import email_utils  # OTP email utility
@@ -614,7 +615,14 @@ def create_project(
     project_file_url = None
     if project_file_key and project_file_key != "undefined":
         config = s3_utils.get_config()
-        project_file_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{project_file_key}"
+        try:
+            keys = json.loads(project_file_key)
+            if isinstance(keys, list):
+                project_file_url = json.dumps([f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{k}" for k in keys])
+            else:
+                project_file_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{project_file_key}"
+        except:
+            project_file_url = f"https://{config['bucket']}.s3.{config['region']}.amazonaws.com/{project_file_key}"
     elif project_file:
         project_file_url = s3_utils.upload_file_to_s3(project_file.file, project_file.filename)
         

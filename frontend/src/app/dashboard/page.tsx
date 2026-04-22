@@ -23,6 +23,8 @@ import {
   LogOut, 
   X, 
   CheckCircle2,
+  Trash2,
+  Mail,
   Share2,
   Eye,
   DownloadCloud,
@@ -96,9 +98,12 @@ function DashboardContent() {
   const [uploadRole, setUploadRole] = useState("");
   const [uploadTools, setUploadTools] = useState("");
   const [uploadTimeline, setUploadTimeline] = useState("");
-  const [uploadProjectFile, setUploadProjectFile] = useState<File | null>(null);
+  const [uploadProjectFiles, setUploadProjectFiles] = useState<File[]>([]);
   const [uploadRawFile, setUploadRawFile] = useState<File | null>(null);
   const [uploadThumbnailFile, setUploadThumbnailFile] = useState<File | null>(null);
+  const [existingProjectFiles, setExistingProjectFiles] = useState<string[]>([]);
+  const [existingThumbnail, setExistingThumbnail] = useState<string | null>(null);
+  const [existingRaw, setExistingRaw] = useState<string | null>(null);
   
   // Edit State
   const [editingProject, setEditingProject] = useState<any>(null);
@@ -265,41 +270,38 @@ function DashboardContent() {
     try {
       let final_media_key = "";
       let final_raw_key = "";
-      let final_project_key = "";
+      let final_project_keys: string[] = [];
       let final_thumbnail_key = "";
 
-      // Start the chain
-      // 1. Primary Video
-      await startMultipartUpload(selectedFile, async (url, key) => {
+      // 1. Primary Video (REQUIRED)
+      const resMain = await startMultipartUpload(selectedFile, (url, key) => {
         final_media_key = key;
-        
-        // 2. Thumbnail (if exists)
-        if (uploadThumbnailFile) {
-          await startMultipartUpload(uploadThumbnailFile, async (tUrl, tKey) => {
-            final_thumbnail_key = tKey;
-            
-            // 3. Raw Video (if exists)
-            if (uploadRawFile) {
-               await startMultipartUpload(uploadRawFile, async (rawUrl, rawKey) => {
-                  final_raw_key = rawKey;
-                  finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
-               });
-            } else {
-               finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
-            }
-          });
-        } else {
-          // 3. Raw Video (if exists)
-          if (uploadRawFile) {
-             await startMultipartUpload(uploadRawFile, async (rawUrl, rawKey) => {
-                final_raw_key = rawKey;
-                finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
-             });
-          } else {
-             finishProjectCreation(final_media_key, final_raw_key, final_project_key, final_thumbnail_key);
-          }
-        }
       });
+      if (!resMain.key) throw new Error("Main video upload failed");
+      final_media_key = resMain.key;
+
+      // 2. Thumbnail (Optional)
+      if (uploadThumbnailFile) {
+        const resT = await startMultipartUpload(uploadThumbnailFile, () => {});
+        final_thumbnail_key = resT.key;
+      }
+
+      // 3. Raw Video (Optional)
+      if (uploadRawFile) {
+        const resR = await startMultipartUpload(uploadRawFile, () => {});
+        final_raw_key = resR.key;
+      }
+
+      // 4. Project Files (Multiple, Optional)
+      if (uploadProjectFiles.length > 0) {
+        for (const f of uploadProjectFiles) {
+          const resP = await startMultipartUpload(f, () => {});
+          if (resP.key) final_project_keys.push(resP.key);
+        }
+      }
+
+      // Finalize creation
+      finishProjectCreation(final_media_key, final_raw_key, final_project_keys, final_thumbnail_key);
 
       // Clear form immediately
       setUploadTitle('');
@@ -313,7 +315,7 @@ function DashboardContent() {
     }
   };
 
-  const finishProjectCreation = async (mKey: string, rKey: string, pKey: string, tKey: string) => {
+  const finishProjectCreation = async (mKey: string, rKey: string, pKeys: string[], tKey: string) => {
     try {
       const formData = new FormData();
       formData.append('title', uploadTitle);
@@ -322,7 +324,7 @@ function DashboardContent() {
       formData.append('category', uploadCategory);
       formData.append('media_key', mKey);
       if (rKey) formData.append('raw_media_key', rKey);
-      if (pKey) formData.append('project_file_key', pKey);
+      if (pKeys.length > 0) formData.append('project_file_key', JSON.stringify(pKeys));
       if (tKey) formData.append('thumbnail_key', tKey);
       
       if (uploadRole) formData.append('role', uploadRole);
@@ -443,6 +445,20 @@ function DashboardContent() {
     setUploadRole(project.role || "");
     setUploadTools(project.tools_used || "");
     setUploadTimeline(project.timeline_breakdown || "");
+    
+    if (project.project_file_url) {
+      if (Array.isArray(project.project_file_url)) {
+        setExistingProjectFiles(project.project_file_url);
+      } else {
+        setExistingProjectFiles([project.project_file_url]);
+      }
+    } else {
+      setExistingProjectFiles([]);
+    }
+    
+    setExistingThumbnail(project.thumbnail_url || null);
+    setExistingRaw(project.raw_media_url || null);
+    
     setIsModalOpen(true);
   };
 
@@ -450,13 +466,40 @@ function DashboardContent() {
     if (!editingProject) return;
     setIsUploading(true);
     try {
+      let updatedProjectFileUrls = [...existingProjectFiles];
+      let final_thumbnail_url = existingThumbnail;
+      let final_raw_url = existingRaw;
+
+      // 1. Upload new project files
+      if (uploadProjectFiles.length > 0) {
+        for (const f of uploadProjectFiles) {
+          const res = await startMultipartUpload(f, () => {});
+          if (res.url) updatedProjectFileUrls.push(res.url);
+        }
+      }
+
+      // 2. Upload new thumbnail if selected
+      if (uploadThumbnailFile) {
+        const resT = await startMultipartUpload(uploadThumbnailFile, () => {});
+        if (resT.url) final_thumbnail_url = resT.url;
+      }
+
+      // 3. Upload new raw video if selected
+      if (uploadRawFile) {
+        const resR = await startMultipartUpload(uploadRawFile, () => {});
+        if (resR.url) final_raw_url = resR.url;
+      }
+
       await api.put(`/projects/${editingProject.id}`, {
         title: uploadTitle,
         description: uploadDesc,
         category: uploadCategory,
         role: uploadRole,
         tools_used: uploadTools,
-        timeline_breakdown: uploadTimeline
+        timeline_breakdown: uploadTimeline,
+        project_file_url: JSON.stringify(updatedProjectFileUrls),
+        thumbnail_url: final_thumbnail_url,
+        raw_media_url: final_raw_url
       });
       
       await fetchPortfolio();
@@ -479,9 +522,12 @@ function DashboardContent() {
     setUploadTools("");
     setUploadTimeline("");
     setSelectedFile(null);
-    setUploadProjectFile(null);
+    setUploadProjectFiles([]);
     setUploadRawFile(null);
     setUploadThumbnailFile(null);
+    setExistingProjectFiles([]);
+    setExistingThumbnail(null);
+    setExistingRaw(null);
     setUploadProgress(0);
     setIsUploading(false);
   };
@@ -1391,33 +1437,93 @@ function DashboardContent() {
                    </div>
                    
                    <div className="space-y-1">
-                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Proof of Work: Project File (Optional)</label>
-                     <div className="relative group mt-2">
-                       <input 
-                         type="file" 
-                         accept=".prproj,.drp,.aep,image/*"
-                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                         onChange={(e) => setUploadProjectFile(e.target.files?.[0] || null)}
-                         disabled={isUploading}
-                       />
-                       <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition ${uploadProjectFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
-                         {uploadProjectFile ? (
-                           <>
-                             <p className="text-sm font-medium text-white max-w-sm text-center truncate">{uploadProjectFile.name}</p>
-                             <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">Attached</p>
-                           </>
-                         ) : (
-                           <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition">Attach .prproj, .aep, or timeline screenshot</p>
-                         )}
-                       </div>
-                     </div>
-                   </div>
+                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Proof of Work: Project Files (Optional)</label>
+                      <div className="mt-2 space-y-3">
+                        {/* --- Existing Files (on Server) --- */}
+                        {editingProject && existingProjectFiles.length > 0 && (
+                          <div className="space-y-2">
+                             <p className="text-[10px] text-zinc-500 uppercase font-mono tracking-[0.2em] mb-1">On Cloud Storage</p>
+                             {existingProjectFiles.map((url, idx) => {
+                               const fileName = url.split('/').pop()?.split('?')[0] || "Attachment";
+                               return (
+                                <div key={`existing-${idx}`} className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800 p-3 rounded-lg group/item">
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-8 h-8 rounded bg-brand/10 flex items-center justify-center shrink-0">
+                                      <CheckCircle2 className="w-4 h-4 text-brand" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-white truncate">{decodeURIComponent(fileName)}</p>
+                                      <p className="text-[9px] text-zinc-500 font-mono uppercase tracking-widest mt-0.5">Stored</p>
+                                    </div>
+                                  </div>
+                                  <button 
+                                    onClick={() => setExistingProjectFiles(prev => prev.filter((_, i) => i !== idx))}
+                                    className="w-8 h-8 rounded-full hover:bg-red-500/20 hover:text-red-500 text-zinc-600 transition flex items-center justify-center"
+                                    title="Delete from project"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                               );
+                             })}
+                          </div>
+                        )}
+
+                        <div className="relative group">
+                          <input 
+                            type="file" 
+                            multiple
+                            accept=".prproj,.drp,.aep,image/*"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              setUploadProjectFiles(prev => [...prev, ...files]);
+                            }}
+                            disabled={isUploading}
+                          />
+                          <div className="w-full border-2 border-dashed border-zinc-800 bg-transparent group-hover:border-zinc-600 p-4 flex flex-col items-center justify-center transition text-center">
+                            <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition">
+                              {editingProject ? 'Add More Attachments' : 'Add .prproj, .aep, or timeline screenshots'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* --- New Files (Selected but not uploaded) --- */}
+                        {uploadProjectFiles.length > 0 && (
+                          <div className="space-y-2">
+                            {editingProject && <p className="text-[10px] text-zinc-500 uppercase font-mono tracking-[0.2em] mb-1">New Attachments</p>}
+                            <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                              {uploadProjectFiles.map((file, idx) => (
+                                <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 p-3 rounded-lg group/item">
+                                  <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center shrink-0">
+                                      <Grid className="w-4 h-4 text-zinc-500" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-white truncate">{file.name}</p>
+                                      <p className="text-[9px] text-zinc-500 font-mono uppercase tracking-widest mt-0.5">Pending Upload</p>
+                                    </div>
+                                  </div>
+                                  <button 
+                                    onClick={() => setUploadProjectFiles(prev => prev.filter((_, i) => i !== idx))}
+                                    className="w-8 h-8 rounded-full hover:bg-red-500/20 hover:text-red-500 text-zinc-600 transition flex items-center justify-center"
+                                    title="Remove attachment"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                 </div>
 
-                {!editingProject && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Final Edit Video</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Final Edit Video</label>
+                    {!editingProject ? (
                       <div className="relative group mt-2">
                         <input 
                           type="file" 
@@ -1427,55 +1533,91 @@ function DashboardContent() {
                           required
                           disabled={isUploading}
                         />
-                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
                           {selectedFile ? (
                             <>
-                              <CheckCircle2 className="w-5 h-5 text-white mb-2" />
-                              <p className="text-[11px] font-bold text-white max-w-[140px] truncate">{selectedFile.name}</p>
-                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                              <p className="text-sm font-medium text-white max-w-[200px] truncate">{selectedFile.name}</p>
+                              <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">Selected</p>
                             </>
                           ) : (
-                            <>
-                              <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
-                              <p className="text-xs font-bold text-white uppercase tracking-widest">Final Video</p>
-                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">MP4/WEBM</p>
-                            </>
+                            <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Drag & Drop or Click to Upload</p>
                           )}
                         </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Custom Thumbnail <span className="text-zinc-600">(Static Cover)</span></label>
-                      <div className="relative group mt-2">
-                        <input 
-                          type="file" 
-                          accept="image/*"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                          onChange={(e) => setUploadThumbnailFile(e.target.files?.[0] || null)}
-                          disabled={isUploading}
-                        />
-                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${uploadThumbnailFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
-                          {uploadThumbnailFile ? (
-                            <>
-                              <CheckCircle2 className="w-5 h-5 text-white mb-2" />
-                              <p className="text-[11px] font-bold text-white max-w-[140px] truncate">{uploadThumbnailFile.name}</p>
-                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
-                            </>
-                          ) : (
-                            <>
-                              <Grid className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
-                              <p className="text-xs font-bold text-white uppercase tracking-widest">Poster Image</p>
-                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Optional</p>
-                            </>
-                          )}
-                        </div>
+                    ) : (
+                      <div className="mt-2 p-4 border border-zinc-800 bg-zinc-900/30 rounded-lg flex items-center justify-center text-center">
+                        <p className="text-[10px] text-zinc-600 uppercase font-mono tracking-widest">Main video cannot be replaced here. Re-upload as new project if needed.</p>
                       </div>
-                    </div>
+                    )}
+                  </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Raw Video <span className="text-zinc-600">(Before/After)</span></label>
-                      <div className="relative group mt-2">
+                  <div className="space-y-1">
+                    <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Custom Thumbnail (Optional)</label>
+                    <div className="mt-2 space-y-2">
+                      {editingProject && existingThumbnail && (
+                        <div className="relative group/thumb aspect-video bg-zinc-900 border border-zinc-800 rounded overflow-hidden">
+                           <img src={existingThumbnail} alt="Existing Thumbnail" className="w-full h-full object-cover opacity-50" />
+                           <div className="absolute inset-0 flex items-center justify-center">
+                             <button 
+                               onClick={() => setExistingThumbnail(null)}
+                               className="px-3 py-1.5 bg-red-500 text-white text-[9px] uppercase font-bold tracking-widest rounded hover:bg-red-600 transition"
+                             >
+                               Delete Thumbnail
+                             </button>
+                           </div>
+                        </div>
+                      )}
+                      
+                      {(!editingProject || !existingThumbnail) && (
+                        <div className="relative group">
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                            onChange={(e) => setUploadThumbnailFile(e.target.files?.[0] || null)}
+                            disabled={isUploading}
+                          />
+                          <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition ${uploadThumbnailFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                            {uploadThumbnailFile ? (
+                              <>
+                                <p className="text-sm font-medium text-white max-w-[200px] truncate">{uploadThumbnailFile.name}</p>
+                                <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">New Thumbnail</p>
+                              </>
+                            ) : (
+                              <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Upload Poster Image</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-6 border-t border-zinc-900">
+                  <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Raw Footage / Before Edit (Optional)</label>
+                  <div className="mt-2 space-y-2">
+                     {editingProject && existingRaw && (
+                       <div className="flex items-center justify-between bg-zinc-900/50 border border-zinc-800 p-4 rounded-lg">
+                         <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded bg-brand/10 flex items-center justify-center text-brand">
+                              <Play className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-white uppercase tracking-wider">Original Raw Footage</p>
+                              <p className="text-[9px] text-zinc-500 font-mono mt-0.5 tracking-widest uppercase">Stored on S3</p>
+                            </div>
+                         </div>
+                         <button 
+                           onClick={() => setExistingRaw(null)}
+                           className="px-4 py-2 bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition rounded"
+                         >
+                           Delete Raw
+                         </button>
+                       </div>
+                     )}
+
+                     {(!editingProject || !existingRaw) && (
+                       <div className="relative group">
                         <input 
                           type="file" 
                           accept="video/*"
@@ -1483,25 +1625,20 @@ function DashboardContent() {
                           onChange={(e) => setUploadRawFile(e.target.files?.[0] || null)}
                           disabled={isUploading}
                         />
-                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition h-full text-center ${uploadRawFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition ${uploadRawFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
                           {uploadRawFile ? (
                             <>
-                              <CheckCircle2 className="w-5 h-5 text-white mb-2" />
-                              <p className="text-[11px] font-bold text-white max-w-[140px] truncate">{uploadRawFile.name}</p>
-                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Ready</p>
+                              <p className="text-sm font-medium text-white max-w-sm text-center truncate">{uploadRawFile.name}</p>
+                              <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">New Raw Selected</p>
                             </>
                           ) : (
-                            <>
-                              <UploadCloud className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-white transition" />
-                              <p className="text-xs font-bold text-white uppercase tracking-widest">Raw Video</p>
-                              <p className="text-[9px] text-zinc-500 mt-1 font-mono uppercase tracking-widest">Optional</p>
-                            </>
+                            <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Attach original video for before/after comparison</p>
                           )}
                         </div>
                       </div>
-                    </div>
+                     )}
                   </div>
-                )}
+                </div>
 
                 {error && (
                   <div className="p-4 border border-red-500/20 bg-red-500/5">
