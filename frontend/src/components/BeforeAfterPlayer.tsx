@@ -34,6 +34,9 @@ export default function BeforeAfterPlayer({
   const [isMuted, setIsMuted] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const rawVideoRef = useRef<HTMLVideoElement>(null);
@@ -55,10 +58,22 @@ export default function BeforeAfterPlayer({
       else follower.play().catch(() => {});
     }
 
-    // Force strict frame alignment if they drift > 30ms (approx 1 frame)
     const drift = Math.abs(leader.currentTime - follower.currentTime);
-    if (drift > 0.03) {
+    
+    // Only force sync if the drift is significant (> 0.08s) or if the leader just jumped (seek/loop)
+    // Small drifts are normal and forcing sync every frame causes stuttering
+    if (drift > 0.08 || leader.seeking || (leader.currentTime < 0.1 && follower.currentTime > 1)) {
       follower.currentTime = leader.currentTime;
+    }
+
+    // Update progress state
+    if (!isSeeking) {
+      setCurrentTime(leader.currentTime);
+    }
+
+    // Handle Looping synchronization
+    if (leader.currentTime < follower.currentTime - 1) {
+        follower.currentTime = leader.currentTime;
     }
 
     // Ensure playback speed matches exactly
@@ -67,7 +82,7 @@ export default function BeforeAfterPlayer({
     }
 
     syncIntervalRef.current = requestAnimationFrame(syncVideos);
-  }, []);
+  }, [isSeeking]);
 
   useEffect(() => {
     if (isPlaying && isReady) {
@@ -164,10 +179,27 @@ export default function BeforeAfterPlayer({
     }
   };
 
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    
+    if (finalVideoRef.current) finalVideoRef.current.currentTime = time;
+    if (rawVideoRef.current) rawVideoRef.current.currentTime = time;
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   // ─── Video Readiness ──────────────────────────────────────────────────────
 
   const handleCanPlay = () => {
     if (rawVideoRef.current && finalVideoRef.current) {
+        if (finalVideoRef.current.duration) {
+            setDuration(finalVideoRef.current.duration);
+        }
         // Redundancy check for readiness
         if (rawVideoRef.current.readyState >= 2 && finalVideoRef.current.readyState >= 2) {
             setIsReady(true);
@@ -334,24 +366,53 @@ export default function BeforeAfterPlayer({
         animate={{ y: (isHovered || isDragging || !isPlaying || expanded) ? 0 : 40, opacity: (isHovered || isDragging || !isPlaying || expanded) ? 1 : 0 }}
         className="absolute inset-x-0 bottom-0 z-50 p-6 bg-gradient-to-t from-black via-black/40 to-transparent"
       >
-         <div className="flex items-center justify-between pointer-events-auto">
-            <div className="flex items-center gap-4">
+         <div className="flex items-center justify-between gap-6 pointer-events-auto">
+            <div className="flex items-center gap-4 flex-1">
                <button 
                   onClick={togglePlay}
-                  className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:bg-zinc-200 transition active:scale-90"
+                  className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:bg-zinc-200 transition active:scale-90 shrink-0"
                >
                   {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
                </button>
+
+               {/* TIMELINE */}
+               <div className="flex-1 flex items-center gap-3 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/5">
+                  <span className="text-[10px] font-mono text-zinc-400 w-10 text-right">{formatTime(currentTime)}</span>
+                  <div className="relative flex-1 h-1.5 group/timeline">
+                     <input 
+                        type="range"
+                        min={0}
+                        max={duration || 100}
+                        step={0.01}
+                        value={currentTime}
+                        onChange={handleSeek}
+                        onMouseDown={() => setIsSeeking(true)}
+                        onMouseUp={() => setIsSeeking(false)}
+                        onTouchStart={() => setIsSeeking(true)}
+                        onTouchEnd={() => setIsSeeking(false)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                     />
+                     <div className="absolute inset-0 bg-white/10 rounded-full overflow-hidden">
+                        <motion.div 
+                           className="h-full bg-white relative"
+                           style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                        >
+                           <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover/timeline:scale-100 transition-transform" />
+                        </motion.div>
+                     </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-zinc-400 w-10">{formatTime(duration)}</span>
+               </div>
                
                <button 
                   onClick={toggleMute}
-                  className="w-10 h-10 bg-black/40 backdrop-blur-xl border border-white/10 text-white rounded-full flex items-center justify-center hover:scale-105 transition"
+                  className="w-10 h-10 bg-black/40 backdrop-blur-xl border border-white/10 text-white rounded-full flex items-center justify-center hover:scale-105 transition shrink-0"
                >
                   {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
                 <div className="hidden sm:flex flex-col items-end mr-2">
                    <p className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">A/B Ratio</p>
                    <p className="text-[10px] font-bold text-white font-mono">{Math.round(sliderPosition)}% Revealed</p>
