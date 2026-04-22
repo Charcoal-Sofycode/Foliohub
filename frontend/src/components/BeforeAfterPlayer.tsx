@@ -25,8 +25,8 @@ export default function BeforeAfterPlayer({
   beforeLabel = "Raw Footage",
   afterLabel = "Post Production"
 }: BeforeAfterPlayerProps) {
-  // Start playing automatically in expanded mode
-  const [isPlaying, setIsPlaying] = useState(expanded);
+  // Autoplay disabled
+  const [isPlaying, setIsPlaying] = useState(false);
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isHovered, setIsHovered] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -101,8 +101,8 @@ export default function BeforeAfterPlayer({
     if (!v1 || !v2 || !isReady) return;
 
     if (isPlaying) {
-      v1.play().catch(() => {});
-      v2.play().catch(() => {});
+      v1.play().catch(() => setIsPlaying(false));
+      v2.play().catch(() => setIsPlaying(false));
     } else {
       v1.pause();
       v2.pause();
@@ -262,9 +262,14 @@ export default function BeforeAfterPlayer({
       )}
 
       {/* Helper Labels (Overlay) */}
-      <div className="absolute inset-x-0 top-0 z-40 pointer-events-none p-6 flex justify-between items-start">
+       <div className="absolute inset-x-0 top-0 z-40 pointer-events-none p-6 flex justify-between items-start">
          <motion.div 
-            animate={{ opacity: (isHovered || !isPlaying) ? 1 : 0.3 }}
+            animate={{ 
+              opacity: sliderPosition > 10 
+                ? (isHovered || !isPlaying || expanded ? 1 : 0.3) 
+                : 0 
+            }}
+            transition={{ duration: 0.4 }}
             className="flex flex-col gap-1"
          >
             <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-zinc-500">Draft Source</span>
@@ -274,7 +279,12 @@ export default function BeforeAfterPlayer({
          </motion.div>
 
          <motion.div 
-            animate={{ opacity: (isHovered || !isPlaying) ? 1 : 0.3 }}
+            animate={{ 
+              opacity: sliderPosition < 90 
+                ? (isHovered || !isPlaying || expanded ? 1 : 0.3) 
+                : 0 
+            }}
+            transition={{ duration: 0.4 }}
             className="flex flex-col gap-1 items-end text-right"
          >
             <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-zinc-500">Final Master</span>
