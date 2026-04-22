@@ -181,12 +181,41 @@ export default function BeforeAfterPlayer({
     setIsMuted(!isMuted);
   };
 
-  const openFullscreen = (e?: React.MouseEvent) => {
-    if (!expanded) {
-      e?.stopPropagation();
-      setIsFullscreen(true);
+  const toggleFullscreen = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    
+    if (!document.fullscreenElement) {
+      try {
+        if (containerRef.current?.requestFullscreen) {
+          await containerRef.current.requestFullscreen();
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await (containerRef.current as any).webkitRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } catch (err) {
+        console.error("Fullscreen error:", err);
+        // Fallback to CSS fullscreen
+        setIsFullscreen(true);
+      }
+    } else {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+      setIsFullscreen(false);
     }
   };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
@@ -231,12 +260,30 @@ export default function BeforeAfterPlayer({
   const PlayerContent = (
     <div 
       ref={containerRef}
-      className={`relative w-full h-full bg-[#030303] overflow-hidden select-none group touch-none ${className} ${expanded ? 'rounded-none' : 'rounded-xl cursor-zoom-in border border-white/5'}`}
-      style={{ '--slider-pos': `${sliderPosition}%` } as any}
+      className={`relative w-full h-full bg-[#030303] overflow-hidden select-none group touch-none transition-all duration-500 ${className} ${isFullscreen ? 'fixed inset-0 z-[200] !rounded-none' : (expanded ? 'rounded-none' : 'rounded-xl cursor-zoom-in border border-white/5')}`}
+      style={{ 
+        '--slider-pos': `${sliderPosition}%`,
+        zIndex: isFullscreen ? 2147483647 : undefined 
+      } as any}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={!expanded ? openFullscreen : undefined}
+      onClick={!expanded && !isFullscreen ? toggleFullscreen : undefined}
     >
+      {/* FULLSCREEN CLOSE BUTTON (For CSS fallback or non-native browsers) */}
+      {isFullscreen && (
+        <div className="absolute top-0 inset-x-0 z-[100] px-6 py-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+           <div className="flex flex-col">
+              <span className="text-[8px] font-mono uppercase tracking-[0.3em] text-zinc-400">Analysis Mode</span>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h3>
+           </div>
+           <button 
+             onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+             className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center pointer-events-auto shadow-xl"
+           >
+             <X className="w-5 h-5" />
+           </button>
+        </div>
+      )}
       {/* ERROR STATE */}
       {loadError && (
         <div className="absolute inset-0 z-[70] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center gap-4">
@@ -438,8 +485,11 @@ export default function BeforeAfterPlayer({
                    <p className="text-[10px] font-bold text-white font-mono">{Math.round(sliderPosition)}% Revealed</p>
                 </div>
                 {!expanded && (
-                  <button onClick={openFullscreen} className="w-10 h-10 bg-white/10 backdrop-blur-xl border border-white/10 text-white rounded-full flex items-center justify-center hover:bg-white hover:text-black transition">
-                    <Maximize2 className="w-4 h-4" />
+                  <button 
+                    onClick={toggleFullscreen} 
+                    className={`w-10 h-10 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center transition ${isFullscreen ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white hover:text-black'}`}
+                  >
+                    {isFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </button>
                 )}
             </div>
@@ -448,58 +498,5 @@ export default function BeforeAfterPlayer({
     </div>
   );
 
-  if (expanded) return PlayerContent;
-
-  return (
-    <>
-      <div className={`w-full h-full ${className}`}>{PlayerContent}</div>
-      <AnimatePresence>
-        {isFullscreen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-[#020202] flex flex-col pt-safe"
-          >
-            {/* Fullscreen Header */}
-            <div className="px-8 py-6 lg:px-12 flex justify-between items-center shrink-0 border-b border-white/5">
-               <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <SlidersHorizontal className="w-3 h-3 text-[#6366f1]" />
-                    <span className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">Dual-Buffer Analysis</span>
-                  </div>
-                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic leading-none">{title}</h3>
-               </div>
-               <button 
-                 onClick={() => setIsFullscreen(false)}
-                 className="group w-12 h-12 bg-white/5 hover:bg-white text-zinc-500 hover:text-black rounded-full flex items-center justify-center transition-all duration-300"
-               >
-                 <X className="w-5 h-5 transition-transform group-hover:rotate-90" />
-               </button>
-            </div>
-
-            {/* Main Player Display */}
-            <div className="flex-1 w-full h-full p-4 lg:p-12 overflow-hidden flex items-center justify-center">
-               <div className="w-full h-full max-w-6xl aspect-video rounded-xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-white/10">
-                  <BeforeAfterPlayer 
-                    rawUrl={rawUrl} 
-                    finalUrl={finalUrl} 
-                    title={title} 
-                    thumbnailUrl={thumbnailUrl}
-                    expanded={true} 
-                    beforeLabel={beforeLabel} 
-                    afterLabel={afterLabel} 
-                  />
-               </div>
-            </div>
-
-            {/* Tips Section */}
-            <div className="p-8 text-center text-zinc-600 font-mono text-[9px] uppercase tracking-[0.4em]">
-                Tip: Audio levels crossfade dynamically with the slider
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
-  );
+  return PlayerContent;
 }
