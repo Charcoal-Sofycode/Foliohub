@@ -644,6 +644,12 @@ def create_project(
     if project_file_url and timeline_breakdown:
        is_verified = True
 
+    from audio_analyzer import generate_automatic_audio_proof
+    
+    audio_proof_data = None
+    if project_type == "video":
+        audio_proof_data = generate_automatic_audio_proof(title, description)
+
     # 3. Save the project to the Supabase database
     new_project = models.Project(
         portfolio_id=portfolio.id,
@@ -658,7 +664,8 @@ def create_project(
         thumbnail_url=thumbnail_url,
         timeline_breakdown=timeline_breakdown,
         project_file_url=project_file_url,
-        is_verified=is_verified
+        is_verified=is_verified,
+        audio_proof=audio_proof_data
     )
     
     db.add(new_project)

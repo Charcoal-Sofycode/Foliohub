@@ -233,6 +233,8 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                            finalUrl={project.media_url} 
                            title={project.title} 
                            thumbnailUrl={project.thumbnail_url}
+                           audioProof={project.audio_proof}
+                           editorName={portfolio.title}
                         />
                       ) : project.media_url ? (
                          <PortfolioPlayer 
