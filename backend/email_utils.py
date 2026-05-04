@@ -133,11 +133,18 @@ def send_otp_email(to_email: str, otp: str) -> bool:
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
             server.ehlo()
             server.starttls()
+            server.ehlo()
+
+        with server:
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        
         logger.info(f"OTP email sent to {to_email}")
         with open("otp_debug.log", "a") as f:
             f.write(f"[{datetime.now().isoformat()}] SUCCESS: OTP email sent to {to_email}\n")
@@ -204,11 +211,19 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+        # Check if we should use SSL (Port 465) or STARTTLS (Port 587)
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
             server.ehlo()
             server.starttls()
+            server.ehlo()
+
+        with server:
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        
         with open("otp_debug.log", "a") as f:
             f.write(f"[{datetime.now().isoformat()}] SUCCESS: 2FA email sent to {to_email}\n")
         return True
@@ -233,11 +248,18 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
     msg["To"] = to_email
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+        else:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
             server.ehlo()
             server.starttls()
+            server.ehlo()
+
+        with server:
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        
         with open("otp_debug.log", "a") as f:
             f.write(f"[{datetime.now().isoformat()}] SUCCESS: Generic email sent to {to_email}\n")
         return True
