@@ -17,6 +17,7 @@ import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -138,9 +139,13 @@ def send_otp_email(to_email: str, otp: str) -> bool:
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
         logger.info(f"OTP email sent to {to_email}")
+        with open("otp_debug.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] SUCCESS: OTP email sent to {to_email}\n")
         return True
     except Exception as exc:
         logger.error(f"Failed to send OTP email to {to_email}: {exc}")
+        with open("otp_debug.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] ERROR: Failed to send OTP email to {to_email}: {exc}\n")
         return False
 
 
@@ -149,6 +154,10 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
     Send a 6-digit 2FA login code to the given email address.
     Returns True on success, False on failure.
     """
+    # ADDED: Persistent Debug Log for OTPs (to verify generation when delivery fails)
+    with open("otp_debug.log", "a") as f:
+        f.write(f"[{datetime.now().isoformat()}] 2FA OTP for {to_email}: {otp}\n")
+
     if not SMTP_USER or not SMTP_PASSWORD:
         # Development fallback
         logger.warning(f"[DEV] SMTP not configured. 2FA for {to_email}: {otp}")
@@ -200,9 +209,13 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        with open("otp_debug.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] SUCCESS: 2FA email sent to {to_email}\n")
         return True
     except Exception as exc:
         logger.error(f"Failed to send 2FA email: {exc}")
+        with open("otp_debug.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] ERROR: Failed to send 2FA email to {to_email}: {exc}\n")
         return False
 
 def send_email(to_email: str, subject: str, body: str) -> bool:
@@ -225,7 +238,11 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        with open("otp_debug.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] SUCCESS: Generic email sent to {to_email}\n")
         return True
     except Exception as exc:
         logger.error(f"Failed to send email to {to_email}: {exc}")
+        with open("otp_debug.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] ERROR: Failed to send generic email to {to_email}: {exc}\n")
         return False
