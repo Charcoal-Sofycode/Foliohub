@@ -107,7 +107,12 @@ def validate_password_strength(password: str):
 
 @app.post("/signup/request-otp")
 @limiter.limit("3/minute")
-def request_signup_otp(request: Request, data: schemas.SignupRequestOTP, db: Session = Depends(get_db)):
+def request_signup_otp(
+    request: Request, 
+    background_tasks: BackgroundTasks,
+    data: schemas.SignupRequestOTP, 
+    db: Session = Depends(get_db)
+):
     # 1. Check if email already exists
     existing_user = db.query(models.User).filter(models.User.email == data.email).first()
     if existing_user:
@@ -128,10 +133,10 @@ def request_signup_otp(request: Request, data: schemas.SignupRequestOTP, db: Ses
     
     db.commit()
 
-    # 4. Send email
+    # 4. Send email in background
     subject = "FolioHub — Your Verification Code"
     body = f"Welcome to FolioHub!\n\nYour 6-digit verification code is: {otp}\n\nThis code will expire in 10 minutes. Use it to complete your studio setup."
-    email_utils.send_email(data.email, subject, body)
+    background_tasks.add_task(email_utils.send_email, data.email, subject, body)
 
     return {"message": "Verification code sent to your email."}
 
@@ -173,7 +178,12 @@ def create_user(request: Request, user_data: schemas.UserCreateVerified, db: Ses
 
 @app.post("/login", response_model=schemas.Token)
 @limiter.limit("10/minute")
-def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login_for_access_token(
+    request: Request, 
+    background_tasks: BackgroundTasks,
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
+):
     user = db.query(models.User).filter(models.User.email == form_data.username).first()
     
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
@@ -188,8 +198,8 @@ def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestFor
         code = f"{secrets.randbelow(1000000):06d}"
         user.two_factor_code = code
         db.commit()
-        # Dispatch verification email
-        email_utils.send_2fa_email(user.email, code)
+        # Dispatch verification email in background to prevent UI hang
+        background_tasks.add_task(email_utils.send_2fa_email, user.email, code)
         return {"access_token": None, "token_type": "bearer", "requires_2fa": True}
 
 
@@ -343,7 +353,12 @@ def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depend
 
 @app.post("/forgot-password")
 @limiter.limit("3/minute")
-def forgot_password(request: Request, data: schemas.ForgotPassword, db: Session = Depends(get_db)):
+def forgot_password(
+    request: Request, 
+    background_tasks: BackgroundTasks,
+    data: schemas.ForgotPassword, 
+    db: Session = Depends(get_db)
+):
     """Step 1: Generate a 6-digit OTP and email it to the user."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
     if not user:
@@ -360,8 +375,8 @@ def forgot_password(request: Request, data: schemas.ForgotPassword, db: Session 
     user.reset_otp_expires_at = expires_at
     db.commit()
 
-    # Send the OTP via email
-    email_utils.send_otp_email(data.email, otp)
+    # Send the OTP via email in background
+    background_tasks.add_task(email_utils.send_otp_email, data.email, otp)
 
     return {"message": "Verification code dispatched to your studio email."}
 
