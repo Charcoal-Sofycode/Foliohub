@@ -20,15 +20,15 @@ def test_email():
     msg = MIMEText("Test email from Foliohub setup.")
     msg["Subject"] = "Test Email"
     msg["From"] = EMAIL_FROM
-    msg["To"] = SMTP_USER # Send to self for test
+    msg["To"] = "chethanac488@gmail.com" # Send to the user's actual email
     
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
             server.ehlo()
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [SMTP_USER], msg.as_string())
-        print("Success! Email sent.")
+            server.sendmail(SMTP_USER, ["chethanac488@gmail.com"], msg.as_string())
+        print(f"Success! Email sent to chethanac488@gmail.com.")
     except Exception as e:
         print(f"Error: {e}")
 
