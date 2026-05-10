@@ -83,7 +83,7 @@ export default function BeforeAfterPlayer({
     }
 
     // Update volume based on slider directly
-    if (!isMuted) {
+    if (!isMuted && rawVideoRef.current && finalVideoRef.current) {
       const rawVol = Math.max(0, Math.min(1, sliderPosRef.current / 100));
       const finalVol = Math.max(0, Math.min(1, (100 - sliderPosRef.current) / 100));
       rawVideoRef.current.volume = rawVol;
