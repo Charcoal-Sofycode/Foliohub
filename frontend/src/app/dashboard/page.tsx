@@ -102,7 +102,6 @@ function DashboardContent() {
   const [existingProjectFiles, setExistingProjectFiles] = useState<string[]>([]);
   const [existingThumbnail, setExistingThumbnail] = useState<string | null>(null);
   const [existingRaw, setExistingRaw] = useState<string | null>(null);
-  const [uploadAudioProof, setUploadAudioProof] = useState<any>(null);
   
   // Edit State
   const [editingProject, setEditingProject] = useState<any>(null);
@@ -457,7 +456,6 @@ function DashboardContent() {
     
     setExistingThumbnail(project.thumbnail_url || null);
     setExistingRaw(project.raw_media_url || null);
-    setUploadAudioProof(project.audio_proof || null);
     
     setIsModalOpen(true);
   };
@@ -500,7 +498,6 @@ function DashboardContent() {
         project_file_url: JSON.stringify(updatedProjectFileUrls),
         thumbnail_url: final_thumbnail_url,
         raw_media_url: final_raw_url,
-        audio_proof: uploadAudioProof
       });
       
       await fetchPortfolio();
@@ -529,7 +526,6 @@ function DashboardContent() {
     setExistingProjectFiles([]);
     setExistingThumbnail(null);
     setExistingRaw(null);
-    setUploadAudioProof(null);
     setUploadProgress(0);
     setIsUploading(false);
   };

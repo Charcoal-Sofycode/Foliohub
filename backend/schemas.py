@@ -209,7 +209,6 @@ class ProjectResponse(BaseModel):
     optimized_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
     transcoding_status: str = "pending"
-    audio_proof: Optional[dict] = None
     created_at: datetime
     story: Optional[ProjectStoryResponse] = None
 

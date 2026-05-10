@@ -89,7 +89,6 @@ class Project(Base):
     
     view_count = Column(Integer, default=0)
     is_published = Column(Boolean, default=True)
-    audio_proof = Column(JSON, nullable=True) # New: Stores verdict, spotlights, etc.
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
