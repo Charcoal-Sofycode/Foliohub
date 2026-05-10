@@ -52,26 +52,23 @@ def health_check():
 
 @app.get("/debug/test-email")
 def debug_test_email(email: str, db: Session = Depends(get_db)):
-    """Diagnostic route to test email delivery synchronously and see errors."""
+    """Diagnostic route to test email delivery via Resend API."""
     from email_utils import send_2fa_email
     import email_utils
     
     config_info = {
-        "host": email_utils.SMTP_HOST,
-        "port": email_utils.SMTP_PORT,
-        "user": email_utils.SMTP_USER,
-        "from": email_utils.EMAIL_FROM,
-        "sender_resolved": email_utils.SENDER_EMAIL
+        "api_key_configured": bool(email_utils.RESEND_API_KEY),
+        "from": email_utils.EMAIL_FROM
     }
     
     success = send_2fa_email(email, "123456")
     
     if success:
-        return {"status": "success", "message": f"Test code 123456 sent to {email}", "config": config_info}
+        return {"status": "success", "message": f"Test code 123456 sent to {email} via Resend API", "config": config_info}
     else:
         return {
             "status": "error", 
-            "message": "Failed to send email. Check Render logs for the full traceback.",
+            "message": "Failed to send email via Resend API. Check Render logs for specific API error codes.",
             "config": config_info
         }
 
