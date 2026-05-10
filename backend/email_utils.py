@@ -25,10 +25,10 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.resend.com").strip()
+SMTP_PORT = int(str(os.getenv("SMTP_PORT", 587)).strip())
+SMTP_USER = os.getenv("SMTP_USER", "").strip()
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
 EMAIL_FROM = os.getenv("EMAIL_FROM", f"FolioHub <{SMTP_USER}>").strip('"')
 
 # Extract the actual email address for the SMTP envelope sender
@@ -232,9 +232,10 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
             f.write(f"[{datetime.now().isoformat()}] SUCCESS: 2FA email sent to {to_email}\n")
         return True
     except Exception as exc:
-        logger.error(f"Failed to send 2FA email: {exc}")
+        logger.error(f"CRITICAL EMAIL FAILURE for {to_email}. Error: {type(exc).__name__}: {exc}")
+        logger.error(f"Current Config: HOST={SMTP_HOST}, PORT={SMTP_PORT}, USER={SMTP_USER}, FROM={EMAIL_FROM}")
         with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] ERROR: Failed to send 2FA email to {to_email}: {exc}\n")
+            f.write(f"[{datetime.now().isoformat()}] ERROR: {exc}\n")
         return False
 
 def send_email(to_email: str, subject: str, body: str) -> bool:

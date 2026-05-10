@@ -10,6 +10,15 @@ import secrets
 import random
 import re
 import json
+import logging
+
+# Configure logging to ensure errors show up in Render/Production logs
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 import s3_utils  # Import your new S3 logic
 import email_utils  # OTP email utility
@@ -40,6 +49,31 @@ app = FastAPI(title="Portfolio SaaS API")
 @app.get("/health")
 def health_check():
     return {"status": "awake"}
+
+@app.get("/debug/test-email")
+def debug_test_email(email: str, db: Session = Depends(get_db)):
+    """Diagnostic route to test email delivery synchronously and see errors."""
+    from email_utils import send_2fa_email
+    import email_utils
+    
+    config_info = {
+        "host": email_utils.SMTP_HOST,
+        "port": email_utils.SMTP_PORT,
+        "user": email_utils.SMTP_USER,
+        "from": email_utils.EMAIL_FROM,
+        "sender_resolved": email_utils.SENDER_EMAIL
+    }
+    
+    success = send_2fa_email(email, "123456")
+    
+    if success:
+        return {"status": "success", "message": f"Test code 123456 sent to {email}", "config": config_info}
+    else:
+        return {
+            "status": "error", 
+            "message": "Failed to send email. Check Render logs for the full traceback.",
+            "config": config_info
+        }
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
