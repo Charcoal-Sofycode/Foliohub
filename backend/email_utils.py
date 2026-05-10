@@ -1,275 +1,87 @@
-"""
-email_utils.py
---------------
-Utility for sending transactional emails via SMTP (e.g. Gmail App Password,
-SendGrid SMTP relay, Mailgun, etc.)
-
-Required .env variables:
-    SMTP_HOST      - e.g. smtp.gmail.com
-    SMTP_PORT      - e.g. 587
-    SMTP_USER      - your sender email address
-    SMTP_PASSWORD  - app password / API key
-    EMAIL_FROM     - display name + address, e.g. "FolioHub <no-reply@foliohub.io>"
-"""
 
 import os
-import smtplib
+import requests
 import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from datetime import datetime
-from email.utils import parseaddr
 from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.resend.com").strip()
-SMTP_PORT = int(str(os.getenv("SMTP_PORT", 587)).strip())
-SMTP_USER = os.getenv("SMTP_USER", "").strip()
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
-EMAIL_FROM = os.getenv("EMAIL_FROM", f"FolioHub <{SMTP_USER}>").strip('"')
+# We use the same environment variables, but interpret SMTP_PASSWORD as the Resend API Key
+RESEND_API_KEY = os.getenv("SMTP_PASSWORD", "").strip()
+EMAIL_FROM = os.getenv("EMAIL_FROM", "FolioHub <noreply@sofycode.com>").strip('"')
 
-# Extract the actual email address for the SMTP envelope sender
-_, SENDER_EMAIL = parseaddr(EMAIL_FROM)
-
-
-def send_otp_email(to_email: str, otp: str) -> bool:
+def send_resend_api_email(to_email: str, subject: str, html_content: str, text_content: str = None) -> bool:
     """
-    Send a 6-digit OTP recovery code to the given email address.
-    Returns True on success, False on failure.
+    Sends an email using the Resend HTTP API.
+    Bypasses SMTP port restrictions on cloud hosting.
     """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        # Development fallback: just print the OTP to console
-        logger.warning(
-            f"[DEV] SMTP not configured. OTP for {to_email}: {otp}"
-        )
-        print(f"\n{'='*50}")
-        print(f"  FolioHub Password Recovery OTP")
-        print(f"  Email : {to_email}")
-        print(f"  OTP   : {otp}  (expires in 10 minutes)")
-        print(f"{'='*50}\n")
+    if not RESEND_API_KEY:
+        logger.warning(f"[DEV] RESEND_API_KEY not configured. Email to {to_email}: {subject}")
+        print(f"\n{'='*50}\n  API MOCK: Email to {to_email}\n  Subject: {subject}\n{'='*50}\n")
         return True
 
-    subject = "FolioHub — Your Account Recovery Code"
-
-    html_body = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Account Recovery</title>
-</head>
-<body style="margin:0;padding:0;background-color:#050505;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;padding:40px 0;">
-    <tr>
-      <td align="center">
-        <table width="480" cellpadding="0" cellspacing="0"
-               style="background:#0a0a0a;border:1px solid #27272a;border-radius:16px;overflow:hidden;">
-          <!-- Header -->
-          <tr>
-            <td style="padding:36px 40px 24px;border-bottom:1px solid #18181b;">
-              <p style="margin:0;font-size:22px;font-weight:900;letter-spacing:-0.5px;color:#ffffff;">
-                FOLIO<span style="color:#71717a;">HUB</span>
-              </p>
-            </td>
-          </tr>
-          <!-- Body -->
-          <tr>
-            <td style="padding:36px 40px;">
-              <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">
-                Account Recovery
-              </h1>
-              <p style="margin:0 0 32px;font-size:14px;color:#71717a;line-height:1.6;">
-                We received a request to reset the password for your FolioHub account.
-                Use the code below to complete the recovery. This code is valid for
-                <strong style="color:#a1a1aa;">10 minutes</strong>.
-              </p>
-
-              <!-- OTP Block -->
-              <div style="background:#18181b;border:1px solid #27272a;border-radius:12px;
-                          padding:28px;text-align:center;margin-bottom:32px;">
-                <p style="margin:0 0 8px;font-size:11px;text-transform:uppercase;
-                           letter-spacing:0.2em;color:#52525b;font-weight:600;">
-                  Your Recovery Code
-                </p>
-                <p style="margin:0;font-size:42px;font-weight:900;letter-spacing:0.15em;
-                           color:#ffffff;font-variant-numeric:tabular-nums;">
-                  {otp}
-                </p>
-              </div>
-
-              <p style="margin:0 0 8px;font-size:13px;color:#52525b;line-height:1.6;">
-                If you did not request a password reset, you can safely ignore this email.
-                Your account will remain secure.
-              </p>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="padding:20px 40px;border-top:1px solid #18181b;text-align:center;">
-              <p style="margin:0;font-size:11px;color:#3f3f46;">
-                © 2026 FolioHub. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-"""
-
-    plain_body = (
-        f"Your FolioHub account recovery code is: {otp}\n\n"
-        f"This code expires in 10 minutes.\n\n"
-        f"If you did not request this, please ignore this email."
-    )
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM
-    msg["To"] = to_email
-    msg.attach(MIMEText(plain_body, "plain"))
-    msg.attach(MIMEText(html_body, "html"))
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "from": EMAIL_FROM,
+        "to": [to_email],
+        "subject": subject,
+        "html": html_content
+    }
+    
+    if text_content:
+        payload["text"] = text_content
 
     try:
-        if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=15)
+        if response.status_code in [200, 201]:
+            logger.info(f"Email successfully sent via Resend API to {to_email}")
+            with open("otp_debug.log", "a") as f:
+                f.write(f"[{datetime.now().isoformat()}] SUCCESS: API Email sent to {to_email}\n")
+            return True
         else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-
-        with server:
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
-        
-        logger.info(f"OTP email sent to {to_email}")
-        with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] SUCCESS: OTP email sent to {to_email}\n")
-        return True
-    except Exception as exc:
-        logger.error(f"Failed to send OTP email to {to_email}: {exc}")
-        with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] ERROR: Failed to send OTP email to {to_email}: {exc}\n")
+            logger.error(f"Resend API Error ({response.status_code}): {response.text}")
+            with open("otp_debug.log", "a") as f:
+                f.write(f"[{datetime.now().isoformat()}] API ERROR: {response.status_code} - {response.text}\n")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to connect to Resend API: {e}")
         return False
 
+def send_otp_email(to_email: str, otp: str) -> bool:
+    subject = "FolioHub — Your Account Recovery Code"
+    html_body = f"""
+    <div style="font-family:sans-serif;background:#050505;color:white;padding:40px;border-radius:12px;">
+        <h2 style="color:white;">Account Recovery</h2>
+        <p style="color:#71717a;">Use the code below to reset your password. Valid for 10 minutes.</p>
+        <div style="background:#18181b;padding:24px;text-align:center;font-size:40px;font-weight:bold;letter-spacing:10px;">{otp}</div>
+    </div>
+    """
+    return send_resend_api_email(to_email, subject, html_body, f"Your recovery code is: {otp}")
 
 def send_2fa_email(to_email: str, otp: str) -> bool:
-    """
-    Send a 6-digit 2FA login code to the given email address.
-    Returns True on success, False on failure.
-    """
-    # ADDED: Persistent Debug Log for OTPs (to verify generation when delivery fails)
+    # Persistent Debug Log for OTPs
     with open("otp_debug.log", "a") as f:
         f.write(f"[{datetime.now().isoformat()}] 2FA OTP for {to_email}: {otp}\n")
 
-    if not SMTP_USER or not SMTP_PASSWORD:
-        # Development fallback
-        logger.warning(f"[DEV] SMTP not configured. 2FA for {to_email}: {otp}")
-        print(f"\n{'='*50}\n  FolioHub Two-Factor Auth 2FA\n  Email : {to_email}\n  OTP   : {otp}\n{'='*50}\n")
-        return True
-
     subject = f"FolioHub — {otp} is your verification code"
-
     html_body = f"""
-<!DOCTYPE html>
-<html lang="en">
-<body style="margin:0;padding:0;background-color:#050505;font-family:sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;padding:40px 0;">
-    <tr>
-      <td align="center">
-        <table width="440" cellpadding="0" cellspacing="0" style="background:#0a0a0a;border:1px solid #27272a;border-radius:12px;">
-          <tr>
-            <td style="padding:40px;">
-              <p style="margin:0 0 10px;font-size:18px;font-weight:900;color:#ffffff;">FolioHub Authentication</p>
-              <h1 style="margin:0 0 16px;font-size:32px;font-weight:900;letter-spacing:-1px;color:#ffffff;">Secure Login Code</h1>
-              <p style="margin:0 0 32px;font-size:14px;color:#71717a;line-height:1.6;">
-                Use the verification code below to complete your login. This code keeps your creator studio secure.
-              </p>
-              <div style="background:#18181b;border:1px solid #3f3f46;border-radius:8px;padding:24px;text-align:center;margin-bottom:32px;">
-                <p style="margin:0;font-size:48px;font-weight:900;letter-spacing:0.2em;color:#ffffff;">{otp}</p>
-              </div>
-              <p style="margin:0;font-size:12px;color:#52525b;">If you did not attempt to sign in, please secure your account immediately.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-"""
-    plain_body = f"Your FolioHub login verification code is: {otp}"
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM
-    msg["To"] = to_email
-    msg.attach(MIMEText(plain_body, "plain"))
-    msg.attach(MIMEText(html_body, "html"))
-
-    try:
-        # Check if we should use SSL (Port 465) or STARTTLS (Port 587)
-        if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30)
-        else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-
-        with server:
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
-        
-        with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] SUCCESS: 2FA email sent to {to_email}\n")
-        return True
-    except Exception as exc:
-        logger.error(f"CRITICAL EMAIL FAILURE for {to_email}. Error: {type(exc).__name__}: {exc}")
-        logger.error(f"Current Config: HOST={SMTP_HOST}, PORT={SMTP_PORT}, USER={SMTP_USER}, FROM={EMAIL_FROM}")
-        with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] ERROR: {exc}\n")
-        return False
+    <div style="font-family:sans-serif;background:#050505;color:white;padding:40px;border-radius:12px;border:1px solid #27272a;">
+        <p style="font-weight:bold;font-size:18px;">FolioHub Authentication</p>
+        <h1 style="margin-top:0;">Secure Login Code</h1>
+        <p style="color:#71717a;">Use the verification code below to complete your login.</p>
+        <div style="background:#18181b;padding:24px;text-align:center;font-size:48px;font-weight:bold;letter-spacing:10px;border:1px solid #3f3f46;border-radius:8px;">{otp}</div>
+        <p style="font-size:12px;color:#52525b;margin-top:20px;">If you did not attempt to sign in, please secure your account.</p>
+    </div>
+    """
+    return send_resend_api_email(to_email, subject, html_body, f"Your login code is: {otp}")
 
 def send_email(to_email: str, subject: str, body: str) -> bool:
-    """
-    Generic function to send a plain text email.
-    """
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning(f"[DEV] SMTP not configured. Email to {to_email}: {subject}")
-        print(f"\n{'='*50}\n  FolioHub System Alert: {subject}\n  To: {to_email}\n  Body: {body}\n{'='*50}\n")
-        return True
-
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM
-    msg["To"] = to_email
-
-    try:
-        if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30)
-        else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-
-        with server:
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
-        
-        with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] SUCCESS: Generic email sent to {to_email}\n")
-        return True
-    except Exception as exc:
-        logger.error(f"Failed to send email to {to_email}: {exc}")
-        with open("otp_debug.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] ERROR: Failed to send generic email to {to_email}: {exc}\n")
-        return False
+    return send_resend_api_email(to_email, subject, f"<p>{body}</p>", body)
