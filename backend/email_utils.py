@@ -138,9 +138,9 @@ def send_otp_email(to_email: str, otp: str) -> bool:
 
     try:
         if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30)
         else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
             server.ehlo()
             server.starttls()
             server.ehlo()
@@ -217,9 +217,9 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
     try:
         # Check if we should use SSL (Port 465) or STARTTLS (Port 587)
         if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30)
         else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
             server.ehlo()
             server.starttls()
             server.ehlo()
@@ -254,9 +254,9 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 
     try:
         if SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=10)
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30)
         else:
-            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
             server.ehlo()
             server.starttls()
             server.ehlo()
