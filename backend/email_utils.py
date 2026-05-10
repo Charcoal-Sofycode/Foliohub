@@ -29,7 +29,7 @@ SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-EMAIL_FROM = os.getenv("EMAIL_FROM", f"FolioHub <{SMTP_USER}>")
+EMAIL_FROM = os.getenv("EMAIL_FROM", f"FolioHub <{SMTP_USER}>").strip('"')
 
 # Extract the actual email address for the SMTP envelope sender
 _, SENDER_EMAIL = parseaddr(EMAIL_FROM)
