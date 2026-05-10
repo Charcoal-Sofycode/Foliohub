@@ -772,7 +772,7 @@ function DashboardContent() {
           </aside>
 
           {/* MOBILE BOTTOM NAV */}
-          <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-[#050505] border-t border-zinc-900 flex items-center justify-around px-2 py-2 safe-area-inset-bottom">
+          <nav className="md:hidden fixed bottom-0 inset-x-0 z-[100] bg-[#050505] border-t border-zinc-900 flex items-center justify-around px-2 py-2 safe-area-inset-bottom">
             {[
               { id: 'projects', icon: <Grid className="w-5 h-5" />, label: 'Assets' },
               { id: 'analytics', icon: <BarChart className="w-5 h-5" />, label: 'Stats' },
