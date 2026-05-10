@@ -234,10 +234,12 @@ export default function PortfolioPlayer({
                       poster={thumbnailUrl}
                       className="w-full h-full object-contain"
                       autoPlay
+                      muted={isMuted} // Match initial state or allow autoplay
                       controls
                       controlsList="nodownload noplaybackrate"
                       disablePictureInPicture
                       playsInline
+                      onPlay={() => setIsMuted(false)} // Try to unmute if user allows
                     />
                   </div>
                 )}

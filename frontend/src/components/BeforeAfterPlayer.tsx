@@ -58,7 +58,7 @@ export default function BeforeAfterPlayer({
     // Sync follower to leader
     if (leader.paused !== follower.paused) {
       if (leader.paused) follower.pause();
-      else if (leader.readyState >= 3) follower.play().catch(() => {});
+      else follower.play().catch(() => {});
     }
 
     const drift = leader.currentTime - follower.currentTime;
