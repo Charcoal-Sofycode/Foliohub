@@ -14,6 +14,7 @@ interface BeforeAfterPlayerProps {
   beforeLabel?: string;
   afterLabel?: string;
   editorName?: string;
+  subscriptionTier?: 'free' | 'premium';
 }
 
 export default function BeforeAfterPlayer({ 
@@ -25,388 +26,252 @@ export default function BeforeAfterPlayer({
   expanded = false,
   beforeLabel = "Raw Footage",
   afterLabel = "Post Production",
-  editorName = "Foliohub Artist"
+  editorName = "Foliohub Artist",
+  subscriptionTier = "free"
 }: BeforeAfterPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [sliderPosition, setSliderPosition] = useState(50);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isSeeking, setIsSeeking] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
   
+  // High-frequency refs to avoid React re-renders
+  const sliderPosRef = useRef(50);
+  const currentTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const isDraggingRef = useRef(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const rawVideoRef = useRef<HTMLVideoElement>(null);
   const finalVideoRef = useRef<HTMLVideoElement>(null);
-  const syncIntervalRef = useRef<number | null>(null);
+  const timeDisplayRef = useRef<HTMLSpanElement>(null);
+  const durationDisplayRef = useRef<HTMLSpanElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
-  const syncVideos = useCallback(() => {
+  // 1. Unified High-Performance Sync Loop
+  const updateLoop = useCallback(() => {
     const leader = finalVideoRef.current;
-    if (!leader) return;
     const follower = rawVideoRef.current;
-    if (!follower) return;
-    
+    if (!leader || !follower) return;
+
+    // Sync follower to leader
     if (leader.paused !== follower.paused) {
       if (leader.paused) follower.pause();
-      else follower.play().catch(() => {});
+      else if (leader.readyState >= 3) follower.play().catch(() => {});
     }
 
-    const drift = Math.abs(leader.currentTime - follower.currentTime);
-    
-    if (drift > 0.3 || leader.seeking) {
+    const drift = leader.currentTime - follower.currentTime;
+    if (Math.abs(drift) > 0.15) {
       follower.currentTime = leader.currentTime;
-      follower.playbackRate = leader.playbackRate;
-    } else if (drift > 0.04) {
-      const speedAdjust = leader.currentTime > follower.currentTime ? 1.1 : 0.9;
-      follower.playbackRate = leader.playbackRate * speedAdjust;
-    } else {
-      if (follower.playbackRate !== leader.playbackRate) {
-        follower.playbackRate = leader.playbackRate;
+    } else if (Math.abs(drift) > 0.01) {
+      // FPS-agnostic micro-adjustment
+      follower.playbackRate = leader.playbackRate * (1 + drift * 0.5);
+    }
+
+    // Update time display directly in DOM (High Performance)
+    if (timeDisplayRef.current) {
+      const minutes = Math.floor(leader.currentTime / 60);
+      const seconds = Math.floor(leader.currentTime % 60);
+      timeDisplayRef.current.innerText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // Update progress bar directly in DOM
+    if (progressBarRef.current && leader.duration) {
+      const progress = (leader.currentTime / leader.duration) * 100;
+      progressBarRef.current.style.width = `${progress}%`;
+    }
+
+    // Update volume based on slider directly
+    if (!isMuted) {
+      const rawVol = Math.max(0, Math.min(1, sliderPosRef.current / 100));
+      const finalVol = Math.max(0, Math.min(1, (100 - sliderPosRef.current) / 100));
+      rawVideoRef.current.volume = rawVol;
+      finalVideoRef.current.volume = finalVol;
+      rawVideoRef.current.muted = rawVol < 0.01;
+      finalVideoRef.current.muted = finalVol < 0.01;
+    }
+
+    if (!leader.paused) {
+      if ('requestVideoFrameCallback' in leader) {
+        (leader as any).requestVideoFrameCallback(updateLoop);
+      } else {
+        requestAnimationFrame(updateLoop);
       }
     }
-
-    if (Math.abs(leader.currentTime - currentTime) > 0.1 || duration < 5) {
-        setCurrentTime(leader.currentTime);
-    }
-
-    syncIntervalRef.current = requestAnimationFrame(syncVideos);
-  }, [currentTime, duration]);
+  }, [isMuted]);
 
   useEffect(() => {
-    if (isPlaying && isReady) {
-      syncIntervalRef.current = requestAnimationFrame(syncVideos);
-    } else {
-      if (syncIntervalRef.current) cancelAnimationFrame(syncIntervalRef.current);
-    }
-    return () => {
-      if (syncIntervalRef.current) cancelAnimationFrame(syncIntervalRef.current);
-    };
-  }, [isPlaying, isReady, syncVideos]);
+    if (isPlaying) updateLoop();
+  }, [isPlaying, updateLoop]);
 
-  useEffect(() => {
-    const vRaw = rawVideoRef.current;
-    const vFinal = finalVideoRef.current;
-    if (!vRaw || !vFinal || !isReady) return;
-
-    if (isPlaying) {
-      vRaw.play().catch(() => setIsPlaying(false));
-      vFinal.play().catch(() => setIsPlaying(false));
-    } else {
-      vRaw.pause();
-      vFinal.pause();
-    }
-  }, [isPlaying, isReady]);
-
-  useEffect(() => {
-    const vRaw = rawVideoRef.current;
-    const vFinal = finalVideoRef.current;
-
-    if (!vRaw || !vFinal) return;
+  // 2. Aspect Ratio Detection
+  const handleMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.target as HTMLVideoElement;
+    const ratio = video.videoWidth / video.videoHeight;
     
-    vRaw.muted = true;
-    vFinal.muted = isMuted;
+    // Set duration
+    if (durationDisplayRef.current) {
+      const d = video.duration;
+      durationRef.current = d;
+      const min = Math.floor(d / 60);
+      const sec = Math.floor(d % 60);
+      durationDisplayRef.current.innerText = `${min}:${sec.toString().padStart(2, '0')}`;
+    }
 
-    if (isMuted) return;
+    // Set Aspect Ratio (low frequency state update is fine)
+    setAspectRatio(ratio);
+    setIsReady(true);
+  };
 
-    const rawVol = Math.max(0, Math.min(1, sliderPosition / 100));
-    const finalVol = Math.max(0, Math.min(1, (100 - sliderPosition) / 100));
-
-    // Simple A/B audio mixing based on slider
-    vRaw.muted = rawVol < 0.05;
-    vRaw.volume = rawVol;
-    vFinal.muted = finalVol < 0.05;
-    vFinal.volume = finalVol;
-  }, [sliderPosition, isMuted]);
-
-  const handlePointerMove = useCallback((e: PointerEvent | React.PointerEvent) => {
+  // 3. Ultra-Smooth Slider (Direct DOM)
+  const handlePointerMove = (e: PointerEvent | React.PointerEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const percentage = (x / rect.width) * 100;
+    
+    sliderPosRef.current = percentage;
     containerRef.current.style.setProperty('--slider-pos', `${percentage}%`);
-    setSliderPosition(percentage);
-  }, []);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    e.stopPropagation();
-    setIsDragging(true);
-    handlePointerMove(e);
+    containerRef.current.style.setProperty('--slider-pos-val', `${percentage}`);
   };
 
   useEffect(() => {
-    if (isDragging) {
-      const onMove = (e: PointerEvent) => handlePointerMove(e);
-      const onUp = () => setIsDragging(false);
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      return () => {
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-      };
-    }
-  }, [isDragging, handlePointerMove]);
+    const onMove = (e: PointerEvent) => {
+      if (isDraggingRef.current) handlePointerMove(e);
+    };
+    const onUp = () => { isDraggingRef.current = false; };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, []);
 
   const togglePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     setIsPlaying(!isPlaying);
-  };
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMuted(!isMuted);
-  };
-
-  const toggleFullscreen = async (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    
-    if (!document.fullscreenElement) {
-      try {
-        if (containerRef.current?.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await (containerRef.current as any).webkitRequestFullscreen();
-        }
-        setIsFullscreen(true);
-      } catch (err) {
-        console.error("Fullscreen error:", err);
-        setIsFullscreen(true);
-      }
+    if (!isPlaying) {
+      finalVideoRef.current?.play().catch(() => {});
+      rawVideoRef.current?.play().catch(() => {});
     } else {
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
-      }
+      finalVideoRef.current?.pause();
+      rawVideoRef.current?.pause();
+    }
+  };
+
+  const toggleFullscreen = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen?.();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
       setIsFullscreen(false);
     }
   };
 
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    document.addEventListener('webkitfullscreenchange', handleFsChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFsChange);
-      document.removeEventListener('webkitfullscreenchange', handleFsChange);
-    };
-  }, []);
-
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
-    setCurrentTime(time);
     if (finalVideoRef.current) finalVideoRef.current.currentTime = time;
     if (rawVideoRef.current) rawVideoRef.current.currentTime = time;
   };
 
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  const handleCanPlay = () => {
-    if (rawVideoRef.current && finalVideoRef.current) {
-        if (finalVideoRef.current.duration) {
-            setDuration(finalVideoRef.current.duration);
-        }
-        if (rawVideoRef.current.readyState >= 2 && finalVideoRef.current.readyState >= 2) {
-            setIsReady(true);
-        }
-    }
-  };
-
-  const handleError = (e: any) => {
-    const video = e.target as HTMLVideoElement;
-    setLoadError(`Playback failed (Error ${video.error?.code || 'Unknown'}).`);
-  };
-
-  const PlayerContent = (
+  return (
     <div 
       ref={containerRef}
-      className={`relative w-full h-full bg-[#030303] overflow-hidden select-none group touch-none transition-all duration-500 ${className} ${isFullscreen ? 'fixed inset-0 z-[200] !rounded-none' : (expanded ? 'rounded-none' : 'rounded-xl cursor-zoom-in border border-white/5')}`}
+      className={`relative w-full bg-black overflow-hidden select-none group touch-none transition-all duration-500 ${className} ${isFullscreen ? 'fixed inset-0 z-[2147483647]' : (expanded ? 'rounded-none' : 'rounded-xl border border-white/5')}`}
       style={{ 
-        '--slider-pos': `${sliderPosition}%`,
-        zIndex: isFullscreen ? 2147483647 : undefined 
+        '--slider-pos': '50%',
+        '--slider-pos-val': '50',
+        aspectRatio: isFullscreen ? 'auto' : (aspectRatio ? aspectRatio : '9/16'),
+        height: isFullscreen ? '100vh' : 'auto',
+        maxHeight: isFullscreen ? 'none' : '82vh',
+        maxWidth: isFullscreen ? 'none' : ((!aspectRatio || aspectRatio < 1) ? 'calc(82vh * 9 / 16)' : 'none')
       } as any}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onClick={!expanded && !isFullscreen ? toggleFullscreen : undefined}
     >
-      {isFullscreen && (
-        <div className="absolute top-0 inset-x-0 z-[100] px-6 py-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
-           <div className="flex flex-col">
-              <span className="text-[8px] font-mono uppercase tracking-[0.3em] text-zinc-400">Analysis Mode</span>
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h3>
-           </div>
-           <button 
-             onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-             className="w-10 h-10 bg-white text-black rounded-full flex items-center justify-center pointer-events-auto shadow-xl"
-           >
-             <X className="w-5 h-5" />
-           </button>
-        </div>
-      )}
-      
-      {loadError && (
-        <div className="absolute inset-0 z-[70] bg-zinc-950 flex flex-col items-center justify-center p-6 text-center gap-4">
-           <AlertCircle className="w-8 h-8 text-red-500/50" />
-           <div>
-              <p className="text-xs font-bold text-white uppercase tracking-widest mb-1">Decryption Failure</p>
-              <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest max-w-[200px]">{loadError}</p>
-           </div>
-           <button onClick={() => window.location.reload()} className="px-4 py-2 border border-zinc-800 rounded-full text-[10px] text-zinc-400 hover:text-white transition flex items-center gap-2">
-              <RefreshCw className="w-3 h-3" /> Refresh Studio
-           </button>
-        </div>
-      )}
-
-      {!isReady && !loadError && (
-        <div className="absolute inset-0 z-[60] bg-[#050505] flex flex-col items-center justify-center gap-4 transition-opacity duration-700">
-           <div className="w-6 h-6 border-2 border-white/5 border-t-white rounded-full animate-spin" />
-           <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.4em]">Initializing Dual-Source</p>
-        </div>
-      )}
-
-      {!isPlaying && isReady && expanded && (
-        <div 
-          onClick={togglePlay}
-          className="absolute inset-0 z-[45] bg-black/40 flex items-center justify-center cursor-pointer group/overlay"
-        >
-           <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center transition-transform group-hover/overlay:scale-110">
-              <Play className="w-8 h-8 text-black ml-1 fill-current" />
-           </div>
-        </div>
-      )}
-
-       <div className="absolute inset-x-0 top-0 z-40 pointer-events-none p-6 flex justify-between items-start">
-         <motion.div 
-            animate={{ opacity: sliderPosition > 10 ? (isHovered || !isPlaying || expanded ? 1 : 0.3) : 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex flex-col gap-1"
-         >
-            <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-zinc-500">Draft Source</span>
-            <div className="px-3 py-1 bg-black/60 backdrop-blur-md rounded border border-white/5">
-               <h5 className="text-[10px] font-bold text-white uppercase tracking-wider">{beforeLabel}</h5>
-            </div>
-         </motion.div>
-
-         <motion.div 
-            animate={{ opacity: sliderPosition < 90 ? (isHovered || !isPlaying || expanded ? 1 : 0.3) : 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex flex-col gap-1 items-end text-right"
-         >
-            <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-zinc-500">Final Master</span>
-            <div className="px-3 py-1 bg-white backdrop-blur-md rounded border border-white/5">
-               <h5 className="text-[10px] font-bold text-black uppercase tracking-wider">{afterLabel}</h5>
-            </div>
-         </motion.div>
-      </div>
-
       <div className="absolute inset-0 z-0">
-        <video
-          ref={rawVideoRef}
-          src={rawUrl}
-          poster={thumbnailUrl}
-          loop
-          muted={isMuted}
-          playsInline
-          onCanPlay={handleCanPlay}
-          onError={handleError}
-          preload="auto"
-          className="w-full h-full object-cover"
-          controlsList="nodownload"
-          disablePictureInPicture
-          onContextMenu={(e) => e.preventDefault()}
-        />
+        <video ref={rawVideoRef} src={rawUrl} loop muted playsInline onLoadedMetadata={handleMetadata} className="w-full h-full object-cover transform-gpu" style={{ willChange: 'transform' }} />
       </div>
 
       <div className="absolute inset-0 z-10" style={{ clipPath: 'inset(0 0 0 var(--slider-pos))' }}>
-        <video
-          ref={finalVideoRef}
-          src={finalUrl}
-          poster={thumbnailUrl}
-          loop
-          muted={isMuted}
-          playsInline
-          onCanPlay={handleCanPlay}
-          onError={handleError}
-          preload="auto"
-          className="w-full h-full object-cover"
-          controlsList="nodownload"
-          disablePictureInPicture
-          onContextMenu={(e) => e.preventDefault()}
-        />
+        <video ref={finalVideoRef} src={finalUrl} loop muted playsInline onLoadedMetadata={handleMetadata} className="w-full h-full object-cover transform-gpu" style={{ willChange: 'transform, clip-path' }} />
       </div>
 
-      <div className="absolute inset-0 z-30 pointer-events-none" onContextMenu={(e) => e.preventDefault()} />
-
       <div 
-        className="absolute inset-y-0 z-50 w-1 bg-white cursor-ew-resize group/slider flex items-center justify-center touch-none"
+        className="absolute inset-y-0 z-50 w-1 bg-white cursor-ew-resize flex items-center justify-center touch-none"
         style={{ left: 'var(--slider-pos)' }}
-        onPointerDown={onPointerDown}
+        onPointerDown={(e) => { e.stopPropagation(); isDraggingRef.current = true; handlePointerMove(e); }}
       >
-        <div className="relative w-10 h-10 bg-white rounded-full shadow-[0_0_30px_rgba(0,0,0,0.5)] flex items-center justify-center transition-transform group-hover/slider:scale-110 active:scale-90">
+        <div className="w-10 h-10 bg-white rounded-full shadow-2xl flex items-center justify-center">
            <MoveHorizontal className="w-5 h-5 text-black" />
-           <div className="absolute inset-0 bg-white rounded-full animate-ping opacity-10" />
         </div>
-        <div className="absolute inset-y-0 w-[1px] bg-white blur-[2px] opacity-50" />
       </div>
 
       <AnimatePresence>
-        {!isPlaying && isReady && !expanded && isHovered && (
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="absolute inset-0 z-[42] flex items-center justify-center pointer-events-none">
-             <div className="px-6 py-3 bg-white text-black text-[10px] font-bold uppercase tracking-[0.3em] rounded-full shadow-2xl">
-                Start Interaction
-             </div>
-          </motion.div>
+        {!isPlaying && isReady && (
+          <div onClick={togglePlay} className="absolute inset-0 z-[45] bg-black/40 flex items-center justify-center cursor-pointer">
+             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center"><Play className="w-8 h-8 text-black fill-current" /></div>
+          </div>
         )}
       </AnimatePresence>
+      
+      {/* --- QUALITY BADGE --- */}
+      <div className="absolute top-6 left-6 z-50 pointer-events-none">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full">
+          <div className={`w-1.5 h-1.5 rounded-full ${subscriptionTier === 'premium' ? 'bg-[#818cf8] animate-pulse shadow-[0_0_8px_#818cf8]' : 'bg-zinc-500'}`} />
+          <span className="text-[9px] font-mono font-black uppercase tracking-[0.2em] text-white/90">
+            {subscriptionTier === 'premium' ? '4K / LOSSLESS' : 'HD / STANDARD'}
+          </span>
+        </div>
+      </div>
 
-      <motion.div 
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: (isHovered || isDragging || !isPlaying || expanded) ? 0 : 40, opacity: (isHovered || isDragging || !isPlaying || expanded) ? 1 : 0 }}
-        className="absolute inset-x-0 bottom-0 z-50 p-6 bg-gradient-to-t from-black via-black/40 to-transparent"
+      {/* --- SIDE IDENTIFIERS --- */}
+      <div 
+        className="absolute top-[4.5rem] left-6 z-50 pointer-events-none transition-opacity duration-200"
+        style={{ opacity: 'clamp(0, calc((var(--slider-pos-val) - 15) / 15), 1)' } as any}
       >
-         <div className="flex items-center justify-between gap-6 pointer-events-auto">
-            <div className="flex items-center gap-4 flex-1">
-               <button onClick={togglePlay} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:bg-zinc-200 transition active:scale-90 shrink-0">
-                  {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-1" />}
-               </button>
+        <div className="px-2 py-1 bg-black/40 backdrop-blur-md border border-white/5 rounded-sm">
+           <span className="text-[8px] font-mono font-black text-white/40 uppercase tracking-[0.2em]">Raw Footage</span>
+        </div>
+      </div>
+      <div 
+        className="absolute top-[4.5rem] right-6 z-50 pointer-events-none transition-opacity duration-200"
+        style={{ opacity: 'clamp(0, calc((85 - var(--slider-pos-val)) / 15), 1)' } as any}
+      >
+        <div className="px-2 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded-sm shadow-[0_0_20px_rgba(255,255,255,0.05)]">
+           <span className="text-[8px] font-mono font-black text-white/90 uppercase tracking-[0.2em]">Post Processed</span>
+        </div>
+      </div>
 
-               <div className="flex-1 flex items-center gap-3 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/5">
-                  <span className="text-[10px] font-mono text-zinc-400 w-10 text-right">{formatTime(currentTime)}</span>
-                  <div className="relative flex-1 h-1.5 group/timeline">
-                     <input type="range" min={0} max={duration || 100} step={0.01} value={currentTime} onChange={handleSeek} onMouseDown={() => setIsSeeking(true)} onMouseUp={() => setIsSeeking(false)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                     <div className="absolute inset-0 bg-white/10 rounded-full overflow-hidden">
-                        <motion.div className="h-full bg-white relative" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}>
-                           <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover/timeline:scale-100 transition-transform" />
-                        </motion.div>
-                     </div>
-                  </div>
-                  <span className="text-[10px] font-mono text-zinc-400 w-10">{formatTime(duration)}</span>
+      <div className="absolute inset-x-0 bottom-0 z-50 p-6 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+         <div className="flex items-center gap-4">
+            <button onClick={togglePlay} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center shrink-0">
+               {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+            </button>
+            <div className="flex-1 flex items-center gap-3 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+               <span ref={timeDisplayRef} className="text-xs font-mono text-zinc-400">0:00</span>
+               <div className="flex-1 h-1 bg-white/10 rounded-full relative overflow-hidden">
+                  <div ref={progressBarRef} className="absolute inset-y-0 left-0 bg-white w-0" />
                </div>
-               
-               <button onClick={toggleMute} className="w-10 h-10 bg-black/40 backdrop-blur-xl border border-white/10 text-white rounded-full flex items-center justify-center hover:scale-105 transition shrink-0">
-                  {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-               </button>
+               <span ref={durationDisplayRef} className="text-xs font-mono text-zinc-400">0:00</span>
             </div>
-
-            <div className="flex items-center gap-3 shrink-0">
-                {!expanded && (
-                  <button onClick={toggleFullscreen} className={`w-10 h-10 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center transition ${isFullscreen ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white hover:text-black'}`}>
-                    {isFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  </button>
-                )}
-            </div>
+            <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="w-10 h-10 bg-black/40 border border-white/10 rounded-full flex items-center justify-center">
+               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+            <button onClick={toggleFullscreen} className="w-10 h-10 bg-white/10 hover:bg-white hover:text-black transition rounded-full flex items-center justify-center shrink-0">
+               <Maximize2 className="w-4 h-4" />
+            </button>
          </div>
-      </motion.div>
+      </div>
 
+      {isFullscreen && (
+        <button onClick={toggleFullscreen} className="absolute top-6 right-6 z-[100] w-12 h-12 bg-white text-black rounded-full flex items-center justify-center shadow-2xl">
+          <X className="w-6 h-6" />
+        </button>
+      )}
     </div>
   );
-
-  return PlayerContent;
 }

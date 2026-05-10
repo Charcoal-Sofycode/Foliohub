@@ -142,6 +142,7 @@ class PortfolioCreate(BaseModel):
 class PortfolioUpdate(BaseModel):
     title: Optional[str] = None
     bio: Optional[str] = None
+    custom_domain: Optional[str] = None
     theme_preference: Optional[str] = None
     showreel_url: Optional[str] = None
     skills: Optional[str] = None
@@ -161,6 +162,8 @@ class PortfolioResponse(BaseModel):
     id: int
     user_id: int
     subdomain: str
+    custom_domain: Optional[str] = None
+    subscription_tier: str = "free"
     title: str
     bio: Optional[str]
     theme_preference: str

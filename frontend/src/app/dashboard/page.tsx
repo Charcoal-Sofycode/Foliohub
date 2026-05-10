@@ -43,6 +43,7 @@ import {
   Plus,
   Fingerprint
 } from 'lucide-react';
+
 export default function DashboardPage() {
   return (
     <Suspense fallback={
@@ -91,6 +92,7 @@ function DashboardContent() {
   const [uploadDesc, setUploadDesc] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadCategory, setUploadCategory] = useState("general");
   const [uploadRole, setUploadRole] = useState("");
@@ -259,10 +261,33 @@ function DashboardContent() {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) return;
+    const currentTitle = uploadTitle;
+    const currentDesc = uploadDesc;
+    const currentCategory = uploadCategory;
+    const currentRole = uploadRole;
+    const currentTools = uploadTools;
+    const currentTimeline = uploadTimeline;
+    const currentFile = selectedFile;
+    const currentThumbnail = uploadThumbnailFile;
+    const currentRaw = uploadRawFile;
+    const currentProjectFiles = [...uploadProjectFiles];
 
     setIsUploading(true);
+    setIsSubmittingForm(true);
     setError('');
+    
+    // Reset form states immediately so the modal is clean for the next ingest
+    setUploadTitle("");
+    setUploadDesc("");
+    setUploadCategory("general");
+    setUploadRole("");
+    setUploadTools("");
+    setUploadTimeline("");
+    setSelectedFile(null);
+    setUploadThumbnailFile(null);
+    setUploadRawFile(null);
+    setUploadProjectFiles([]);
+
     setIsModalOpen(false); // Close modal now, we are uploading in BG
 
     try {
@@ -272,67 +297,71 @@ function DashboardContent() {
       let final_thumbnail_key = "";
 
       // 1. Primary Video (REQUIRED)
-      const resMain = await startMultipartUpload(selectedFile, (url, key) => {
+      const resMain = await startMultipartUpload(currentFile, (url, key) => {
         final_media_key = key;
       });
       if (!resMain.key) throw new Error("Main video upload failed");
       final_media_key = resMain.key;
 
       // 2. Thumbnail (Optional)
-      if (uploadThumbnailFile) {
-        const resT = await startMultipartUpload(uploadThumbnailFile, () => {});
+      if (currentThumbnail) {
+        const resT = await startMultipartUpload(currentThumbnail, () => {});
         final_thumbnail_key = resT.key;
       }
 
       // 3. Raw Video (Optional)
-      if (uploadRawFile) {
-        const resR = await startMultipartUpload(uploadRawFile, () => {});
+      if (currentRaw) {
+        const resR = await startMultipartUpload(currentRaw, () => {});
         final_raw_key = resR.key;
       }
 
       // 4. Project Files (Multiple, Optional)
-      if (uploadProjectFiles.length > 0) {
-        for (const f of uploadProjectFiles) {
+      if (currentProjectFiles.length > 0) {
+        for (const f of currentProjectFiles) {
           const resP = await startMultipartUpload(f, () => {});
           if (resP.key) final_project_keys.push(resP.key);
         }
       }
 
       // Finalize creation
-      finishProjectCreation(final_media_key, final_raw_key, final_project_keys, final_thumbnail_key);
+      finishProjectCreation(final_media_key, final_raw_key, final_project_keys, final_thumbnail_key, {
+        title: currentTitle,
+        desc: currentDesc,
+        cat: currentCategory,
+        role: currentRole,
+        tools: currentTools,
+        timeline: currentTimeline
+      });
 
-      // Clear form immediately
-      setUploadTitle('');
-      setUploadDesc('');
       setIsUploading(false);
+      setIsSubmittingForm(false);
 
     } catch (err: any) {
       console.error("BG Upload Trigger Error:", err);
       setError('Failed to initiate secure background transfer.');
       setIsUploading(false);
+      setIsSubmittingForm(false);
     }
   };
 
-  const finishProjectCreation = async (mKey: string, rKey: string, pKeys: string[], tKey: string) => {
+  const finishProjectCreation = async (mKey: string, rKey: string, pKeys: string[], tKey: string, meta: any) => {
     try {
       const formData = new FormData();
-      formData.append('title', uploadTitle);
-      formData.append('description', uploadDesc);
+      formData.append('title', meta.title);
+      formData.append('description', meta.desc);
       formData.append('project_type', 'video');
-      formData.append('category', uploadCategory);
+      formData.append('category', meta.cat);
       formData.append('media_key', mKey);
       if (rKey) formData.append('raw_media_key', rKey);
       if (pKeys.length > 0) formData.append('project_file_key', JSON.stringify(pKeys));
       if (tKey) formData.append('thumbnail_key', tKey);
       
-      if (uploadRole) formData.append('role', uploadRole);
-      if (uploadTools) formData.append('tools_used', uploadTools);
-      if (uploadTimeline) formData.append('timeline_breakdown', uploadTimeline);
+      if (meta.role) formData.append('role', meta.role);
+      if (meta.tools) formData.append('tools_used', meta.tools);
+      if (meta.timeline) formData.append('timeline_breakdown', meta.timeline);
 
       await api.post('/projects', formData);
       await fetchPortfolio();
-      
-      // Notify user somehow? The background dock shows success.
     } catch(e) {
       console.error("Late Project Creation Error", e);
     }
@@ -803,14 +832,15 @@ function DashboardContent() {
                         key={project.id} 
                         className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-700 transition duration-300 flex flex-col"
                       >
-                        <div className="aspect-video bg-black relative overflow-hidden flex-shrink-0">
+                        <div className="bg-black relative overflow-hidden flex-shrink-0">
                           {project.raw_media_url && project.media_url ? (
                             <BeforeAfterPlayer 
-                           rawUrl={project.raw_media_url} 
-                           finalUrl={project.media_url} 
-                           title={project.title} 
-                           thumbnailUrl={project.thumbnail_url}
-                        />
+                            rawUrl={project.raw_media_url} 
+                            finalUrl={project.media_url} 
+                            title={project.title} 
+                            thumbnailUrl={project.thumbnail_url}
+                            subscriptionTier={subTier as 'free' | 'premium'}
+                         />
                           ) : project.media_url ? (
                             <PortfolioPlayer 
                               url={project.media_url} 
@@ -818,6 +848,7 @@ function DashboardContent() {
                               optimizedUrl={project.optimized_url}
                               thumbnailUrl={project.thumbnail_url}
                               transcodingStatus={project.transcoding_status}
+                              subscriptionTier={subTier as 'free' | 'premium'}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-zinc-800">
@@ -996,10 +1027,38 @@ function DashboardContent() {
               {activeTab === 'settings' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-[#050505] border border-zinc-900 rounded-xl p-8 lg:p-12 max-w-3xl">
                    <form onSubmit={handleUpdatePortfolio} className="space-y-10">
-                     <div>
-                       <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Primary Domain</label>
-                       <input disabled type="text" value={portfolio.subdomain + ".yourplatform.com"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
-                     </div>
+                      <div>
+                        <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Primary Domain</label>
+                        <input disabled type="text" value={portfolio.subdomain + ".yourplatform.com"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500">Custom Domain</label>
+                          {subTier === 'free' && (
+                            <span className="bg-[#6366f1]/20 text-[#818cf8] text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest border border-[#6366f1]/30">Premium Only</span>
+                          )}
+                        </div>
+                        <div className="relative group">
+                          <input 
+                            name="custom_domain" 
+                            type="text" 
+                            placeholder={subTier === 'free' ? "Upgrade to unlock custom domains" : "work.yourname.com"}
+                            defaultValue={portfolio.custom_domain || ''} 
+                            disabled={subTier === 'free'}
+                            className={`w-full bg-transparent border-b-2 py-3 text-lg font-light outline-none transition-colors ${subTier === 'free' ? 'border-zinc-900 text-zinc-700 cursor-not-allowed' : 'border-zinc-800 focus:border-white text-white'}`} 
+                          />
+                          {subTier === 'free' && (
+                            <div className="absolute right-0 top-3 text-zinc-700 group-hover:text-zinc-500 transition cursor-help" title="Custom domains require a Premium subscription.">
+                               <Shield className="w-4 h-4" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-zinc-600 font-mono mt-3 uppercase tracking-widest leading-relaxed">
+                          {subTier === 'free' 
+                            ? "Point your professional domain to FolioHub (PRO feature)." 
+                            : "Configure your CNAME records to point to our systems to activate."}
+                        </p>
+                      </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div>
                          <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Portfolio Title</label>
@@ -1274,7 +1333,7 @@ function DashboardContent() {
                           
                           <div className="flex gap-4">
                              <a href={`mailto:${lead.email}`} className="px-6 py-3 bg-white text-black text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-200 transition">
-                               Reply
+                                Reply
                              </a>
 
                              {!lead.is_read && (
@@ -1338,9 +1397,8 @@ function DashboardContent() {
               className="w-full max-w-2xl bg-[#050505] border border-zinc-800 p-10 relative z-10 max-h-[90vh] overflow-y-auto"
             >
               <button 
-                onClick={() => !isUploading && setIsModalOpen(false)}
-                className="absolute top-6 right-6 text-zinc-500 hover:text-white transition disabled:opacity-50"
-                disabled={isUploading}
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-6 right-6 text-zinc-500 hover:text-white transition"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -1684,10 +1742,10 @@ function DashboardContent() {
 
                 <button 
                   type="submit" 
-                  disabled={isUploading || (!editingProject && !selectedFile)}
+                  disabled={isSubmittingForm || (!editingProject && !selectedFile)}
                   className="w-full py-5 mt-4 bg-white hover:bg-zinc-200 text-black font-bold uppercase tracking-[0.2em] text-[11px] transition duration-200 disabled:opacity-50 flex items-center justify-center gap-3"
                 >
-                  {isUploading ? (
+                  {isSubmittingForm ? (
                     <>
                       <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
                       {editingProject ? 'Syncing Metadata...' : 'Uploading Media...'}

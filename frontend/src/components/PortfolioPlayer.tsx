@@ -7,19 +7,25 @@ export default function PortfolioPlayer({
   title, 
   optimizedUrl, 
   thumbnailUrl,
-  transcodingStatus 
+  transcodingStatus,
+  subscriptionTier = 'free'
 }: { 
   url: string, 
   title?: string, 
   optimizedUrl?: string, 
   thumbnailUrl?: string,
-  transcodingStatus?: string 
+  transcodingStatus?: string,
+  subscriptionTier?: 'free' | 'premium'
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [qualityOpen, setQualityOpen] = useState(false);
-  const [selectedQuality, setSelectedQuality] = useState(optimizedUrl ? 'Web Optimized' : '4K Lossless');
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  
+  // QUALITY LOGIC: Premium gets 4K toggle, Free is locked to Optimized
+  const isPremium = subscriptionTier === 'premium';
+  const [selectedQuality, setSelectedQuality] = useState(isPremium && !optimizedUrl ? '4K Lossless' : 'Web Optimized');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Source priority: Optimized > URL
@@ -75,6 +81,10 @@ export default function PortfolioPlayer({
           muted={isMuted}
           loop
           playsInline
+          onLoadedMetadata={(e) => {
+            const video = e.target as HTMLVideoElement;
+            setAspectRatio(video.videoWidth / video.videoHeight);
+          }}
         />
 
         {isProcessing && (
@@ -161,17 +171,21 @@ export default function PortfolioPlayer({
                    <h3 className="text-3xl font-black tracking-tighter uppercase leading-none">{title || "Untitled Masterpiece"}</h3>
                 </div>
                 
+                {/* --- QUALITY BADGE & SELECTOR --- */}
                 {!isProcessing && (
                   <div className="relative pt-2 md:pt-0">
                      <button 
+                       disabled={!isPremium}
                        onClick={() => setQualityOpen(!qualityOpen)}
-                       className="flex items-center gap-3 px-6 py-3 bg-zinc-900/40 border border-zinc-800 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white hover:text-black transition-all"
+                       className={`flex items-center gap-3 px-6 py-3 bg-zinc-900/40 border rounded-full text-[10px] font-bold uppercase tracking-[0.2em] transition-all
+                         ${isPremium ? 'border-zinc-800 hover:bg-white hover:text-black' : 'border-zinc-900 text-zinc-600 cursor-not-allowed'}`}
                      >
-                       <Settings className="w-3.5 h-3.5" /> {selectedQuality}
+                       <div className={`w-1.5 h-1.5 rounded-full ${isPremium ? 'bg-[#818cf8] animate-pulse shadow-[0_0_8px_#818cf8]' : 'bg-zinc-500'}`} />
+                       {selectedQuality}
                      </button>
                      
                      <AnimatePresence>
-                       {qualityOpen && (
+                       {qualityOpen && isPremium && (
                          <motion.div 
                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
                            className="absolute top-full left-0 mt-4 w-56 bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.5)] z-[250]"
@@ -200,7 +214,8 @@ export default function PortfolioPlayer({
                initial={{ scale: 0.9, opacity: 0, y: 20 }}
                animate={{ scale: 1, opacity: 1, y: 0 }}
                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-               className="w-full max-w-6xl aspect-video bg-[#020202] relative border border-white/5 shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden rounded-2xl z-10"
+               className="w-full max-w-6xl bg-[#020202] relative border border-white/5 shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden rounded-2xl z-10"
+               style={{ aspectRatio: aspectRatio || '16/9', maxHeight: '85vh' }}
              >
                 {isProcessing ? (
                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] p-12 text-center">

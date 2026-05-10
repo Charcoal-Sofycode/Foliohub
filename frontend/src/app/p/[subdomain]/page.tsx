@@ -171,7 +171,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                    </div>
                    <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} whileInView={{ width: `${portfolio.skill_motion || 50}%` }} viewport={{ once: true }} transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }} className="h-full bg-white relative">
-                         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white w-full blur-[2px]" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white w-full blur-[2px]" />
                       </motion.div>
                    </div>
                  </div>
@@ -183,7 +183,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                    </div>
                    <div className="h-1 w-full bg-zinc-900 rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} whileInView={{ width: `${portfolio.skill_color || 50}%` }} viewport={{ once: true }} transition={{ duration: 1, ease: 'easeOut', delay: 0.4 }} className="h-full bg-white relative">
-                         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white w-full blur-[2px]" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white w-full blur-[2px]" />
                       </motion.div>
                    </div>
                  </div>
@@ -217,7 +217,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             </div>
          </div>
 
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20 items-start">
             {filteredProjects.map((project: any, i: number) => (
                <motion.div 
                  initial={{ opacity: 0, y: 50 }}
@@ -226,14 +226,15 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                  key={project.id} 
                  className="group"
                >
-                  <div className="aspect-video bg-zinc-900 w-full mb-6 overflow-hidden relative">
+                  <div className="w-full mb-6 overflow-hidden relative flex justify-center">
                      {project.raw_media_url && project.media_url ? (
                         <BeforeAfterPlayer 
                            rawUrl={project.raw_media_url || ""}
-                           finalUrl={project.optimized_url || project.media_url}
+                           finalUrl={project.media_url}
                            title={project.title}
                            thumbnailUrl={project.thumbnail_url || ""}
                            editorName={portfolio.title}
+                           subscriptionTier={portfolio.subscription_tier}
                         />
                       ) : project.media_url ? (
                          <PortfolioPlayer 
@@ -242,6 +243,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                            optimizedUrl={project.optimized_url}
                            thumbnailUrl={project.thumbnail_url}
                            transcodingStatus={project.transcoding_status}
+                           subscriptionTier={portfolio.subscription_tier}
                          />
                       ) : null}
                   </div>

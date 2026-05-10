@@ -545,6 +545,12 @@ def update_my_portfolio(
         raise HTTPException(status_code=404, detail="Portfolio not found")
     
     update_dict = update_data.model_dump(exclude_unset=True)
+    
+    # SAAS SECURITY: Verify premium status for custom domains
+    if 'custom_domain' in update_dict and update_dict['custom_domain']:
+        if current_user.subscription_tier != 'premium':
+            raise HTTPException(status_code=403, detail="Custom domain mapping is a Premium feature. Please upgrade your plan.")
+
     for key, value in update_dict.items():
         setattr(portfolio, key, value)
         
@@ -758,13 +764,28 @@ def get_portfolio_projects(subdomain: str, db: Session = Depends(get_db)):
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
-    return portfolio.projects
+    
+    projects = portfolio.projects
+    is_premium = portfolio.owner.subscription_tier == "premium"
+
+    # SAAS LOGIC: If not premium, mask the master media_url with the optimized one
+    # This enforces "Standard Quality" for free users
+    if not is_premium:
+        for p in projects:
+            if p.optimized_url:
+                p.media_url = p.optimized_url
+                
+    return projects
     
 @app.get("/portfolios/view/{subdomain}", response_model=schemas.PortfolioResponse)
 def get_public_portfolio(subdomain: str, db: Session = Depends(get_db)):
     portfolio = db.query(models.Portfolio).filter(models.Portfolio.subdomain == subdomain).first()
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
+    
+    # Map subscription tier from owner to response
+    portfolio.subscription_tier = portfolio.owner.subscription_tier
+    
     return portfolio
 
 @app.post("/ai/match", response_model=list[schemas.MatchResult])
@@ -831,27 +852,24 @@ def ai_match_editors(request: schemas.MatchRequest, db: Session = Depends(get_db
 def create_checkout_session(current_user: models.User = Depends(get_current_user)):
     try:
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        # price_1TVZpt2ZEcm35CvCu6AWgifY is the $5/month Foliohub Premium price
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
-                'price_data': {
-                    'currency': 'usd',
-                    'product_data': {
-                        'name': 'Premium Editor Plan',
-                        'description': 'Unlimited projects, 4K High Res Videos, and Premium Features',
-                    },
-                    'unit_amount': 500, # $5.00
-                },
+                'price': 'price_1TVZpt2ZEcm35CvCu6AWgifY',
                 'quantity': 1,
             }],
-            mode='payment', # Use subscription for real recurring billing
+            mode='subscription',
             success_url=f'{frontend_url}/dashboard?session_id={{CHECKOUT_SESSION_ID}}',
             cancel_url=f'{frontend_url}/dashboard',
-            client_reference_id=str(current_user.id)
+            client_reference_id=str(current_user.id),
+            customer_email=current_user.email if not current_user.stripe_customer_id else None,
+            customer=current_user.stripe_customer_id
         )
         return {"url": session.url}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Stripe Session Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to initiate premium checkout.")
 
 @app.get("/verify-session/{session_id}")
 def verify_session(session_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -901,6 +919,17 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 user.subscription_tier = "premium"
                 user.stripe_customer_id = session.get('customer')
                 db.commit()
+                logger.info(f"✅ User {user.email} upgraded to Premium via Checkout.")
+
+    elif event['type'] == 'customer.subscription.deleted':
+        subscription = event['data']['object']
+        customer_id = subscription.get('customer')
+        if customer_id:
+            user = db.query(models.User).filter(models.User.stripe_customer_id == customer_id).first()
+            if user:
+                user.subscription_tier = "free"
+                db.commit()
+                logger.info(f"🛑 User {user.email} downgraded to Free (Subscription Deleted).")
 
     return {"status": "success"}
 @app.post("/downgrade")
