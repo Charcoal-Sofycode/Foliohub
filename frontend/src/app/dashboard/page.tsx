@@ -297,6 +297,7 @@ function DashboardContent() {
       let final_thumbnail_key = "";
 
       // 1. Primary Video (REQUIRED)
+      if (!currentFile) throw new Error("No file selected");
       const resMain = await startMultipartUpload(currentFile, (url, key) => {
         final_media_key = key;
       });
