@@ -18,6 +18,7 @@ import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
+from email.utils import parseaddr
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,6 +30,9 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 EMAIL_FROM = os.getenv("EMAIL_FROM", f"FolioHub <{SMTP_USER}>")
+
+# Extract the actual email address for the SMTP envelope sender
+_, SENDER_EMAIL = parseaddr(EMAIL_FROM)
 
 
 def send_otp_email(to_email: str, otp: str) -> bool:
@@ -143,7 +147,7 @@ def send_otp_email(to_email: str, otp: str) -> bool:
 
         with server:
             server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
         
         logger.info(f"OTP email sent to {to_email}")
         with open("otp_debug.log", "a") as f:
@@ -222,7 +226,7 @@ def send_2fa_email(to_email: str, otp: str) -> bool:
 
         with server:
             server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
         
         with open("otp_debug.log", "a") as f:
             f.write(f"[{datetime.now().isoformat()}] SUCCESS: 2FA email sent to {to_email}\n")
@@ -258,7 +262,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 
         with server:
             server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
         
         with open("otp_debug.log", "a") as f:
             f.write(f"[{datetime.now().isoformat()}] SUCCESS: Generic email sent to {to_email}\n")
