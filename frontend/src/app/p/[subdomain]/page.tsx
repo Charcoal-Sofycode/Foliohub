@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { motion } from 'framer-motion';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
-import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download } from 'lucide-react';
+import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download, MessageCircle, Mail, Briefcase, Activity } from 'lucide-react';
 import FolioLogo from '@/components/FolioLogo';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
 import StyleFingerprint from '@/components/StyleFingerprint';
@@ -55,15 +55,32 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
 
   const skillsList = portfolio.skills ? portfolio.skills.split(',').map((s: string) => s.trim()) : [];
 
+  const fontClass = portfolio?.typography === 'serif' ? 'font-serif' : portfolio?.typography === 'mono' ? 'font-mono' : 'font-sans';
+  const accentColor = portfolio?.accent_color || '#ffffff';
+
+  const introInitial = portfolio?.intro_style === 'none' ? { opacity: 1, y: 0 } :
+                       portfolio?.intro_style === 'cinematic' ? { opacity: 0, y: 50, scale: 0.95 } :
+                       portfolio?.intro_style === 'glitch' ? { opacity: 0, x: -50 } :
+                       { opacity: 0, y: 20 };
+
+  const introAnimate = portfolio?.intro_style === 'none' ? { opacity: 1, y: 0 } :
+                       portfolio?.intro_style === 'cinematic' ? { opacity: 1, y: 0, scale: 1 } :
+                       portfolio?.intro_style === 'glitch' ? { opacity: 1, x: 0 } :
+                       { opacity: 1, y: 0 };
+
   return (
-    <main className="min-h-screen bg-[#050505] text-white font-sans selection:bg-white selection:text-black pb-32">
+    <main className={`min-h-screen bg-[#050505] text-white ${fontClass} selection:bg-white selection:text-black pb-32`}>
       
       {/* Navigation */}
       <nav className="fixed top-0 inset-x-0 z-50 mix-blend-difference px-4 sm:px-6 lg:px-12 py-5 sm:py-8 flex justify-between items-center pointer-events-none">
          <div className="pointer-events-auto flex items-center gap-2 sm:gap-4 min-w-0">
            <FolioLogo iconSize={20} />
            <div className="w-px h-4 bg-white/20 hidden sm:block" />
-           <h1 className="text-sm sm:text-lg font-bold tracking-tighter uppercase truncate max-w-[140px] sm:max-w-none hidden sm:block">{portfolio.title}</h1>
+           {portfolio.logo_url ? (
+              <img src={portfolio.logo_url} alt={portfolio.title} className="h-6 sm:h-8 object-contain hidden sm:block" />
+           ) : (
+              <h1 className="text-sm sm:text-lg font-bold tracking-tighter uppercase truncate max-w-[140px] sm:max-w-none hidden sm:block">{portfolio.title}</h1>
+           )}
          </div>
          <div className="flex items-center gap-2 sm:gap-6 pointer-events-auto">
             {portfolio.booking_link && (
@@ -71,7 +88,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                  Book Now
                </a>
             )}
-            <a href="#contact" className="px-4 sm:px-6 py-2 bg-white text-black text-[10px] uppercase font-bold tracking-[0.2em] hover:bg-zinc-300 transition">
+            <a href="#contact" className="px-4 sm:px-6 py-2 text-black text-[10px] uppercase font-bold tracking-[0.2em] hover:opacity-80 transition" style={{ backgroundColor: accentColor }}>
               Hire Me
             </a>
          </div>
@@ -102,8 +119,9 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
 
          <div className="relative z-10 max-w-4xl">
             <motion.h2 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
+              initial={introInitial} 
+              animate={introAnimate} 
+              transition={{ duration: 0.8, ease: "easeOut" }}
               className="text-4xl sm:text-6xl md:text-8xl font-black tracking-tighter uppercase leading-[0.85] mb-4 sm:mb-6"
             >
               {portfolio.title}
@@ -127,6 +145,39 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             </motion.div>
          </div>
       </header>
+
+      {/* Social Proof & Trust Builders */}
+      {(portfolio.social_proof_headline || portfolio.brands_worked_with || portfolio.platform_rating) && (
+         <div className="px-6 lg:px-12 py-12 sm:py-16 border-y border-zinc-900 bg-black flex flex-col md:flex-row items-start md:items-center justify-between gap-12">
+            {portfolio.social_proof_headline && (
+               <div className="flex-1">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Milestone</p>
+                  <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black uppercase tracking-tighter text-white leading-tight">
+                    "{portfolio.social_proof_headline}"
+                  </h3>
+               </div>
+            )}
+            
+            <div className="flex flex-wrap items-start gap-12 md:gap-20">
+               {portfolio.brands_worked_with && (
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3 flex items-center gap-2">Trusted By</span>
+                     <div className="flex flex-wrap gap-3 max-w-sm">
+                       {portfolio.brands_worked_with.split(',').map((brand: string, i: number) => (
+                         <span key={i} className="text-white font-bold uppercase tracking-widest text-sm border-b border-zinc-800 pb-1">{brand.trim()}</span>
+                       ))}
+                     </div>
+                  </div>
+               )}
+               {portfolio.platform_rating && (
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3 flex items-center gap-2">Platform Rating</span>
+                     <span className="text-white font-black text-2xl tracking-tight">{portfolio.platform_rating}</span>
+                  </div>
+               )}
+            </div>
+         </div>
+      )}
 
       {/* Skills & Heatmap */}
       {(skillsList.length > 0 || portfolio.skill_cutting) && (
@@ -259,9 +310,97 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                         </div>
                         <span className="px-3 py-1 bg-zinc-900 text-[10px] font-mono uppercase tracking-widest text-zinc-400 shrink-0">{project.category || 'Video'}</span>
                      </div>
+                     
+                     {project.tags && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                           {project.tags.split(',').map((tag: string, tidx: number) => (
+                             <span key={tidx} className="px-2 py-0.5 border border-zinc-800 text-zinc-400 text-[9px] font-mono uppercase tracking-widest rounded-full bg-zinc-900/50">
+                               {tag.trim()}
+                             </span>
+                           ))}
+                        </div>
+                     )}
+                     
                      <p className="text-zinc-500 font-light mb-4">{project.description}</p>
                      
                      <div className="space-y-4">
+                        {(project.metric_views || project.metric_likes || project.metric_comments || project.metric_retention || project.metric_ctr || project.metric_watch_time || project.client_goals || project.strategy_notes || project.monetization_results) && (
+                           <div className="pt-4 border-t border-zinc-900">
+                             <div className="flex justify-between items-center mb-3">
+                               <p className="text-zinc-600 font-mono uppercase text-[10px] tracking-widest flex items-center gap-2">
+                                 <Activity className="w-3 h-3 text-emerald-500" /> Hybrid Analytics Engine
+                               </p>
+                               {project.source_link && (
+                                 <a href={project.source_link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 hover:text-white transition">
+                                   View Original Source ↗
+                                 </a>
+                               )}
+                             </div>
+                             
+                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                                {project.metric_views && (
+                                   <div className="bg-[#050505] border border-zinc-800 p-3 flex flex-col items-center justify-center text-center">
+                                      <span className="text-zinc-500 text-[9px] uppercase tracking-widest mb-1">Views</span>
+                                      <span className="text-white font-bold text-lg">{project.metric_views}</span>
+                                   </div>
+                                )}
+                                {project.metric_likes && (
+                                   <div className="bg-[#050505] border border-zinc-800 p-3 flex flex-col items-center justify-center text-center">
+                                      <span className="text-zinc-500 text-[9px] uppercase tracking-widest mb-1">Likes</span>
+                                      <span className="text-white font-bold text-lg">{project.metric_likes}</span>
+                                   </div>
+                                )}
+                                {project.metric_comments && (
+                                   <div className="bg-[#050505] border border-zinc-800 p-3 flex flex-col items-center justify-center text-center">
+                                      <span className="text-zinc-500 text-[9px] uppercase tracking-widest mb-1">Comments</span>
+                                      <span className="text-white font-bold text-lg">{project.metric_comments}</span>
+                                   </div>
+                                )}
+                                {project.metric_retention && (
+                                   <div className="bg-[#050505] border border-zinc-800 p-3 flex flex-col items-center justify-center text-center">
+                                      <span className="text-emerald-500/70 text-[9px] uppercase tracking-widest mb-1">Retention</span>
+                                      <span className="text-emerald-400 font-bold text-lg">{project.metric_retention}</span>
+                                   </div>
+                                )}
+                                {project.metric_ctr && (
+                                   <div className="bg-[#050505] border border-zinc-800 p-3 flex flex-col items-center justify-center text-center">
+                                      <span className="text-emerald-500/70 text-[9px] uppercase tracking-widest mb-1">CTR</span>
+                                      <span className="text-emerald-400 font-bold text-lg">{project.metric_ctr}</span>
+                                   </div>
+                                )}
+                                {project.metric_watch_time && (
+                                   <div className="bg-[#050505] border border-zinc-800 p-3 flex flex-col items-center justify-center text-center">
+                                      <span className="text-emerald-500/70 text-[9px] uppercase tracking-widest mb-1">Watch Time</span>
+                                      <span className="text-emerald-400 font-bold text-lg">{project.metric_watch_time}</span>
+                                   </div>
+                                )}
+                             </div>
+
+                             {(project.client_goals || project.strategy_notes || project.monetization_results) && (
+                               <div className="bg-zinc-900/30 border border-zinc-800/50 p-4 space-y-4">
+                                  {project.client_goals && (
+                                    <div>
+                                      <span className="block text-zinc-500 text-[9px] uppercase tracking-widest mb-1">Client Goals</span>
+                                      <p className="text-zinc-300 text-sm font-light leading-relaxed">{project.client_goals}</p>
+                                    </div>
+                                  )}
+                                  {project.strategy_notes && (
+                                    <div>
+                                      <span className="block text-zinc-500 text-[9px] uppercase tracking-widest mb-1">Strategy Notes</span>
+                                      <p className="text-zinc-300 text-sm font-light leading-relaxed">{project.strategy_notes}</p>
+                                    </div>
+                                  )}
+                                  {project.monetization_results && (
+                                    <div>
+                                      <span className="block text-zinc-500 text-[9px] uppercase tracking-widest mb-1">Monetization Results</span>
+                                      <p className="text-emerald-400 font-bold text-sm tracking-wide">{project.monetization_results}</p>
+                                    </div>
+                                  )}
+                               </div>
+                             )}
+                           </div>
+                        )}
+
                         {(project.role || project.tools_used) && (
                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-900 text-sm font-mono mt-4">
                               {project.role && (
@@ -362,14 +501,29 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                <h3 className="text-5xl font-black uppercase tracking-tighter mb-6">Start a <br/>Project.</h3>
                <p className="text-zinc-400 font-light text-lg mb-12">Currently accepting new bookings for {new Date().getFullYear()}. Fill out the form to discuss rates and availability.</p>
                
-               <div className="flex items-center gap-6">
+               <div className="flex flex-wrap items-center gap-4">
+                  {portfolio.whatsapp_number && (
+                    <a href={`https://wa.me/${portfolio.whatsapp_number.replace(/[^0-9]/g, '')}`} target="_blank" className="px-6 py-3 rounded-full border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-black font-bold text-xs uppercase tracking-widest transition flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4" /> WhatsApp
+                    </a>
+                  )}
+                  {portfolio.contact_email && (
+                    <a href={`mailto:${portfolio.contact_email}`} className="px-6 py-3 rounded-full border border-zinc-800 text-white hover:bg-white hover:text-black font-bold text-xs uppercase tracking-widest transition flex items-center gap-2">
+                      <Mail className="w-4 h-4" /> Email
+                    </a>
+                  )}
+                  {portfolio.fiverr_url && (
+                    <a href={portfolio.fiverr_url} target="_blank" className="px-6 py-3 rounded-full border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500 hover:text-black font-bold text-xs uppercase tracking-widest transition flex items-center gap-2">
+                      <Briefcase className="w-4 h-4" /> Fiverr
+                    </a>
+                  )}
                   {portfolio.youtube_url && (
-                    <a href={portfolio.youtube_url} target="_blank" className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:bg-white hover:text-black transition">
+                    <a href={portfolio.youtube_url} target="_blank" className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:bg-white hover:text-black transition" title="YouTube">
                       <Play className="w-5 h-5" />
                     </a>
                   )}
                   {portfolio.instagram_url && (
-                    <a href={portfolio.instagram_url} target="_blank" className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:bg-white hover:text-black transition">
+                    <a href={portfolio.instagram_url} target="_blank" className="w-12 h-12 rounded-full border border-zinc-800 flex items-center justify-center text-zinc-400 hover:bg-white hover:text-black transition" title="Instagram">
                       <Camera className="w-5 h-5" />
                     </a>
                   )}

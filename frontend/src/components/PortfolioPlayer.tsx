@@ -105,17 +105,8 @@ export default function PortfolioPlayer({
         {/* Hover Overlay */}
         {!isProcessing && (
           <div className={`absolute inset-0 bg-black/40 flex flex-col justify-between p-4 transition-all duration-500 ease-in-out ${isHovered ? 'opacity-100 backdrop-blur-sm' : 'opacity-0 backdrop-blur-none'}`}>
-            <div className="flex justify-end">
-               <button 
-                 onClick={(e) => { 
-                   e.stopPropagation(); 
-                   setIsMuted(!isMuted); 
-                 }}
-                 className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all"
-               >
-                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-               </button>
-            </div>
+            <div />
+
             
             <div className="flex justify-center items-center">
                <motion.div 

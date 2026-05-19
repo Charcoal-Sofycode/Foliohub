@@ -41,7 +41,11 @@ import {
   Save,
   AlertCircle,
   Plus,
-  Fingerprint
+  Fingerprint,
+  MessageSquare,
+  PlayCircle,
+  Clock,
+  ExternalLink
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -101,6 +105,20 @@ function DashboardContent() {
   const [uploadProjectFiles, setUploadProjectFiles] = useState<File[]>([]);
   const [uploadRawFile, setUploadRawFile] = useState<File | null>(null);
   const [uploadThumbnailFile, setUploadThumbnailFile] = useState<File | null>(null);
+
+  // Performance Metrics States
+  const [metricViews, setMetricViews] = useState("");
+  const [metricRetention, setMetricRetention] = useState("");
+  const [metricCtr, setMetricCtr] = useState("");
+  const [metricWatchTime, setMetricWatchTime] = useState("");
+  const [metricLikes, setMetricLikes] = useState("");
+  const [metricComments, setMetricComments] = useState("");
+  const [sourceLink, setSourceLink] = useState("");
+  const [clientGoals, setClientGoals] = useState("");
+  const [strategyNotes, setStrategyNotes] = useState("");
+  const [monetizationResults, setMonetizationResults] = useState("");
+  const [uploadTags, setUploadTags] = useState("");
+  const [uploadStatus, setUploadStatus] = useState("published");
   const [existingProjectFiles, setExistingProjectFiles] = useState<string[]>([]);
   const [existingThumbnail, setExistingThumbnail] = useState<string | null>(null);
   const [existingRaw, setExistingRaw] = useState<string | null>(null);
@@ -109,13 +127,24 @@ function DashboardContent() {
   const [editingProject, setEditingProject] = useState<any>(null);
   const [isDeletingId, setIsDeletingId] = useState<number | null>(null);
 
+  // Project Filter State
+  const [projectSearch, setProjectSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("All");
+
 
   // Settings State
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [agreementFile, setAgreementFile] = useState<File | null>(null);
 
   // 2FA State
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [show2faSetupModal, setShow2faSetupModal] = useState(false);
+  const [twoFactorModalType, setTwoFactorModalType] = useState<'enable' | 'disable' | 'edit' | null>(null);
+  const [twoFactorModalPassword, setTwoFactorModalPassword] = useState('');
+  const [twoFactorModalCode, setTwoFactorModalCode] = useState('');
+  const [twoFactorModalError, setTwoFactorModalError] = useState('');
   const [showManagePasswordModal, setShowManagePasswordModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [managementError, setManagementError] = useState('');
@@ -126,6 +155,11 @@ function DashboardContent() {
   // Leads/Inquiries State
   const [inquiries, setInquiries] = useState<any[]>([]);
   const [isInquiriesLoading, setIsInquiriesLoading] = useState(false);
+
+  // Client Reviews State
+  const [reviewsData, setReviewsData] = useState<any[]>([]);
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false);
+  const [totalCommentCount, setTotalCommentCount] = useState(0);
 
   // New: Payment status notification
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
@@ -161,6 +195,20 @@ function DashboardContent() {
 
     initializeDashboard();
   }, [sessionId]);
+
+  // Fetch reviews whenever we switch to reviews tab
+  useEffect(() => {
+    if (activeTab === 'reviews') {
+      fetchReviews();
+    }
+  }, [activeTab]);
+
+  // Fetch total comment count on load
+  useEffect(() => {
+    if (portfolio) {
+      fetchReviewCount();
+    }
+  }, [portfolio]);
 
   // REACTIVE POLLING: Automatically starts when any project is pending/processing
   useEffect(() => {
@@ -244,6 +292,30 @@ function DashboardContent() {
       fetchInquiries();
     }
   }, [activeTab]);
+
+  const fetchReviews = async () => {
+    setIsReviewsLoading(true);
+    try {
+      const res = await api.get('/my-reviews');
+      setReviewsData(res.data);
+      const total = res.data.reduce((acc: number, p: any) => acc + (p.comments?.filter((c: any) => !c.is_resolved).length || 0), 0);
+      setTotalCommentCount(total);
+    } catch (err) {
+      console.error("Failed to load reviews", err);
+    } finally {
+      setIsReviewsLoading(false);
+    }
+  };
+
+  const fetchReviewCount = async () => {
+    try {
+      const res = await api.get('/my-reviews');
+      const total = res.data.reduce((acc: number, p: any) => acc + (p.comments?.filter((c: any) => !c.is_resolved).length || 0), 0);
+      setTotalCommentCount(total);
+    } catch (err) {
+      // silent fail
+    }
+  };
 
   const handleCreatePortfolio = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -331,7 +403,19 @@ function DashboardContent() {
         cat: currentCategory,
         role: currentRole,
         tools: currentTools,
-        timeline: currentTimeline
+        timeline: currentTimeline,
+        metricViews,
+        metricRetention,
+        metricCtr,
+        metricWatchTime,
+        metricLikes,
+        metricComments,
+        sourceLink,
+        clientGoals,
+        strategyNotes,
+        monetizationResults,
+        tags: uploadTags,
+        status: uploadStatus
       });
 
       setIsUploading(false);
@@ -360,6 +444,18 @@ function DashboardContent() {
       if (meta.role) formData.append('role', meta.role);
       if (meta.tools) formData.append('tools_used', meta.tools);
       if (meta.timeline) formData.append('timeline_breakdown', meta.timeline);
+      if (meta.metricViews) formData.append('metric_views', meta.metricViews);
+      if (meta.metricRetention) formData.append('metric_retention', meta.metricRetention);
+      if (meta.metricCtr) formData.append('metric_ctr', meta.metricCtr);
+      if (meta.metricWatchTime) formData.append('metric_watch_time', meta.metricWatchTime);
+      if (meta.metricLikes) formData.append('metric_likes', meta.metricLikes);
+      if (meta.metricComments) formData.append('metric_comments', meta.metricComments);
+      if (meta.sourceLink) formData.append('source_link', meta.sourceLink);
+      if (meta.clientGoals) formData.append('client_goals', meta.clientGoals);
+      if (meta.strategyNotes) formData.append('strategy_notes', meta.strategyNotes);
+      if (meta.monetizationResults) formData.append('monetization_results', meta.monetizationResults);
+      if (meta.tags) formData.append('tags', meta.tags);
+      if (meta.status) formData.append('status', meta.status);
 
       await api.post('/projects', formData);
       await fetchPortfolio();
@@ -446,6 +542,35 @@ function DashboardContent() {
     }
   };
 
+  const handleTwoFactorAction = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setManagementLoading(true);
+    setTwoFactorModalError('');
+    setManagementSuccess('');
+
+    try {
+      if (twoFactorModalType === 'enable') {
+        await api.post('/enable-2fa', { password: twoFactorModalPassword, code: twoFactorModalCode });
+        setTwoFactorEnabled(true);
+        setManagementSuccess('Two-factor authentication successfully enabled.');
+      } else if (twoFactorModalType === 'disable') {
+        await api.post('/disable-2fa', { password: twoFactorModalPassword });
+        setTwoFactorEnabled(false);
+        setManagementSuccess('Two-factor authentication has been disabled.');
+      } else if (twoFactorModalType === 'edit') {
+        await api.post('/edit-2fa', { password: twoFactorModalPassword, new_code: twoFactorModalCode });
+        setManagementSuccess('Two-factor security PIN successfully updated.');
+      }
+      setShow2faSetupModal(false);
+      setTwoFactorModalPassword('');
+      setTwoFactorModalCode('');
+    } catch (err: any) {
+      setTwoFactorModalError(err.response?.data?.detail || 'Verification failed.');
+    } finally {
+      setManagementLoading(false);
+    }
+  };
+
   const handleExportData = async () => {
     setManagementLoading(true);
     try {
@@ -473,6 +598,18 @@ function DashboardContent() {
     setUploadRole(project.role || "");
     setUploadTools(project.tools_used || "");
     setUploadTimeline(project.timeline_breakdown || "");
+    setMetricViews(project.metric_views || "");
+    setMetricRetention(project.metric_retention || "");
+    setMetricCtr(project.metric_ctr || "");
+    setMetricWatchTime(project.metric_watch_time || "");
+    setMetricLikes(project.metric_likes || "");
+    setMetricComments(project.metric_comments || "");
+    setSourceLink(project.source_link || "");
+    setClientGoals(project.client_goals || "");
+    setStrategyNotes(project.strategy_notes || "");
+    setMonetizationResults(project.monetization_results || "");
+    setUploadTags(project.tags || "");
+    setUploadStatus(project.status || "published");
     
     if (project.project_file_url) {
       if (Array.isArray(project.project_file_url)) {
@@ -497,6 +634,13 @@ function DashboardContent() {
       let updatedProjectFileUrls = [...existingProjectFiles];
       let final_thumbnail_url = existingThumbnail;
       let final_raw_url = existingRaw;
+      let final_media_url = editingProject.media_url;
+
+      // 0. Upload new main video if selected
+      if (selectedFile) {
+        const resM = await startMultipartUpload(selectedFile, () => {});
+        if (resM.url) final_media_url = resM.url;
+      }
 
       // 1. Upload new project files
       if (uploadProjectFiles.length > 0) {
@@ -525,9 +669,22 @@ function DashboardContent() {
         role: uploadRole,
         tools_used: uploadTools,
         timeline_breakdown: uploadTimeline,
+        metric_views: metricViews,
+        metric_retention: metricRetention,
+        metric_ctr: metricCtr,
+        metric_watch_time: metricWatchTime,
+        metric_likes: metricLikes,
+        metric_comments: metricComments,
+        source_link: sourceLink,
+        client_goals: clientGoals,
+        strategy_notes: strategyNotes,
+        monetization_results: monetizationResults,
+        tags: uploadTags,
+        status: uploadStatus,
         project_file_url: JSON.stringify(updatedProjectFileUrls),
         thumbnail_url: final_thumbnail_url,
         raw_media_url: final_raw_url,
+        media_url: final_media_url,
       });
       
       await fetchPortfolio();
@@ -558,6 +715,18 @@ function DashboardContent() {
     setExistingRaw(null);
     setUploadProgress(0);
     setIsUploading(false);
+    setMetricViews("");
+    setMetricRetention("");
+    setMetricCtr("");
+    setMetricWatchTime("");
+    setUploadTags("");
+    setUploadStatus("published");
+    setMetricLikes("");
+    setMetricComments("");
+    setSourceLink("");
+    setClientGoals("");
+    setStrategyNotes("");
+    setMonetizationResults("");
   };
 
 
@@ -567,9 +736,19 @@ function DashboardContent() {
     setSettingsLoading(true);
     try {
       const formData = new FormData(e.target as HTMLFormElement);
-      const data = Object.fromEntries(formData.entries());
+      const data: any = Object.fromEntries(formData.entries());
+      
+      // Handle Agreement File Upload
+      if (agreementFile) {
+        const res = await startMultipartUpload(agreementFile, () => {});
+        if (res.url) {
+          data.agreement_url = res.url;
+        }
+      }
+
       const res = await api.put('/portfolios/me', data);
       setPortfolio(res.data);
+      setAgreementFile(null);
       alert('Portfolio Updated!');
     } catch(err) {
       console.error(err);
@@ -692,7 +871,7 @@ function DashboardContent() {
                       required
                     />
                     <span className="mt-2 sm:mt-0 sm:absolute sm:right-0 text-zinc-600 pointer-events-none font-medium text-sm sm:text-base">
-                      .yourplatform.com
+                      .foliohub.media
                     </span>
                   </div>
                 </div>
@@ -751,6 +930,15 @@ function DashboardContent() {
                 >
                   <Zap className="w-4 h-4" /> Upgrade Plan
                 </button>
+                <button 
+                  onClick={() => setActiveTab('reviews')}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'reviews' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                >
+                  <MessageSquare className="w-4 h-4" /> Client Reviews
+                  {totalCommentCount > 0 && (
+                    <span className="ml-auto text-[10px] font-mono bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">{totalCommentCount}</span>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -776,6 +964,7 @@ function DashboardContent() {
             {[
               { id: 'projects', icon: <Grid className="w-5 h-5" />, label: 'Assets' },
               { id: 'analytics', icon: <BarChart className="w-5 h-5" />, label: 'Stats' },
+              { id: 'reviews', icon: <MessageSquare className="w-5 h-5" />, label: 'Reviews' },
               { id: 'inquiries', icon: <Mail className="w-5 h-5" />, label: 'Leads' },
               { id: 'settings', icon: <Settings className="w-5 h-5" />, label: 'Config' },
               { id: 'billing', icon: <Zap className="w-5 h-5" />, label: 'Plan' },
@@ -823,104 +1012,190 @@ function DashboardContent() {
                   {/* Global Style Fingerprint */}
                   <StyleFingerprint editable={true} />
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 items-start">
-                  {portfolio.projects?.length > 0 ? (
-                     portfolio.projects.map((project: any, i: number) => (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        key={project.id} 
-                        className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-700 transition duration-300 flex flex-col"
-                      >
-                        <div className="bg-black relative overflow-hidden flex-shrink-0">
-                          {project.raw_media_url && project.media_url ? (
-                            <BeforeAfterPlayer 
-                            rawUrl={project.raw_media_url} 
-                            finalUrl={project.media_url} 
-                            title={project.title} 
-                            thumbnailUrl={project.thumbnail_url}
-                            subscriptionTier={subTier as 'free' | 'premium'}
-                         />
-                          ) : project.media_url ? (
-                            <PortfolioPlayer 
-                              url={project.media_url} 
-                              title={project.title}
-                              optimizedUrl={project.optimized_url}
-                              thumbnailUrl={project.thumbnail_url}
-                              transcodingStatus={project.transcoding_status}
-                              subscriptionTier={subTier as 'free' | 'premium'}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-zinc-800">
-                              <Play className="w-8 h-8" />
-                            </div>
-                          )}
-                          <div className="absolute top-3 left-3 bg-black/60 backdrop-blur text-white text-[10px] uppercase font-mono tracking-widest px-2 py-1 rounded-sm border border-white/10 pointer-events-none">
-                             Video
-                          </div>
-                          
-                          <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                             <button 
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 openEditModal(project);
-                               }}
-                               className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-black transition pointer-events-auto"
-                               title="Edit Metadata"
-                             >
-                               <Edit className="w-3.5 h-3.5" />
-                             </button>
-                             <button 
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 handleDeleteProject(project.id);
-                               }}
-                               className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition pointer-events-auto"
-                               title="Delete Project"
-                             >
-                               {isDeletingId === project.id ? (
-                                 <div className="w-3 h-3 border border-red-500 border-t-transparent rounded-full animate-spin" />
-                               ) : (
-                                 <Trash2 className="w-3.5 h-3.5" />
-                               )}
-                             </button>
-                          </div>
-
-
-                        </div>
-                        <div className="p-6 flex-1 flex flex-col">
-                          <h3 className="text-lg font-bold truncate text-white mb-2">{project.title}</h3>
-                          <p className="text-zinc-500 text-sm line-clamp-2 font-light flex-1">{project.description || 'No metadata provided.'}</p>
-                          <div className="mt-6 flex items-center justify-between border-t border-zinc-900 pt-4">
-                             <div className="flex items-center gap-4 text-[11px] text-zinc-500 font-mono uppercase tracking-widest">
-                              <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /> {project.view_count || 0}</span>
-                              <span className="flex items-center gap-1.5 text-white/50"><CheckCircle2 className="w-3.5 h-3.5" /> Published</span>
-                            </div>
-                          </div>
-                        </div>
-                        {/* ── Project Story Timeline ── */}
-                        <ProjectStoryTimeline
-                          projectId={project.id}
-                          projectTitle={project.title}
-                        />
-                      </motion.div>
-                    ))
-                  ) : (
-                    <div className="col-span-full py-40 flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl bg-[#050505]">
-                      <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-6">
-                        <UploadCloud className="w-6 h-6 text-zinc-500" />
-                      </div>
-                      <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Empty Repository</h3>
-                      <p className="text-zinc-500 mb-8 text-center max-w-sm text-sm font-light">Your portfolio is currently blank. Ingest your first major edit to begin.</p>
-                      <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="px-6 py-3 border border-zinc-700 text-white text-xs uppercase tracking-widest font-bold rounded-sm hover:bg-white hover:text-black transition"
-                      >
-                        Initiate Upload
-                      </button>
+                  {/* Project Filters */}
+                  <div className="flex flex-col md:flex-row items-center gap-4 bg-[#050505] p-4 rounded-xl border border-zinc-900">
+                    <div className="relative flex-1 w-full">
+                      <Eye className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                      <input 
+                        type="text" 
+                        placeholder="Search assets by title or description..." 
+                        className="w-full bg-black/40 border border-zinc-800 rounded-lg pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-zinc-500 transition"
+                        value={projectSearch}
+                        onChange={(e) => setProjectSearch(e.target.value)}
+                      />
                     </div>
-                  )}
+                    
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <div className="relative flex-1 md:w-48">
+                        <select 
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-[10px] uppercase tracking-widest font-mono text-zinc-200 outline-none focus:border-zinc-500 appearance-none cursor-pointer hover:border-zinc-700 transition"
+                          value={filterCategory}
+                          onChange={(e) => setFilterCategory(e.target.value)}
+                        >
+                          {["All", ...Array.from(new Set((portfolio?.projects || []).map((p: any) => p.category || "general")))].map((cat: any) => (
+                            <option key={cat} value={cat} className="bg-zinc-900 text-white">{cat}</option>
+                          ))}
+                        </select>
+                        <SlidersHorizontal className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500 pointer-events-none" />
+                      </div>
+
+                      <div className="relative flex-1 md:w-48">
+                        <select 
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-[10px] uppercase tracking-widest font-mono text-zinc-200 outline-none focus:border-zinc-500 appearance-none cursor-pointer hover:border-zinc-700 transition"
+                          value={filterStatus}
+                          onChange={(e) => setFilterStatus(e.target.value)}
+                        >
+                          <option value="All" className="bg-zinc-900 text-white">Status: All</option>
+                          <option value="published" className="bg-zinc-900 text-white">Published</option>
+                          <option value="approved" className="bg-zinc-900 text-white">Approved</option>
+                          <option value="needs_revision" className="bg-zinc-900 text-white">Needs Revision</option>
+                        </select>
+                        <SlidersHorizontal className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 items-start">
+                  {(() => {
+                    const filtered = (portfolio?.projects || []).filter((p: any) => {
+                      const matchesSearch = p.title.toLowerCase().includes(projectSearch.toLowerCase()) || 
+                                            (p.description && p.description.toLowerCase().includes(projectSearch.toLowerCase()));
+                      const matchesCategory = filterCategory === "All" || p.category === filterCategory;
+                      const matchesStatus = filterStatus === "All" || p.status === filterStatus;
+                      return matchesSearch && matchesCategory && matchesStatus;
+                    });
+
+                    if (filtered.length > 0) {
+                      return filtered.map((project: any, i: number) => (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          key={project.id} 
+                          className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-700 transition duration-300 flex flex-col"
+                        >
+                          <div className="bg-black relative overflow-hidden flex-shrink-0">
+                            {project.raw_media_url && project.media_url ? (
+                              <BeforeAfterPlayer 
+                              rawUrl={project.raw_media_url} 
+                              finalUrl={project.media_url} 
+                              title={project.title} 
+                              thumbnailUrl={project.thumbnail_url}
+                              subscriptionTier={subTier as 'free' | 'premium'}
+                              qualityBadgeClassName="absolute top-3 left-[4.8rem] z-50 pointer-events-none"
+                           />
+                            ) : project.media_url ? (
+                              <PortfolioPlayer 
+                                url={project.media_url} 
+                                title={project.title}
+                                optimizedUrl={project.optimized_url}
+                                thumbnailUrl={project.thumbnail_url}
+                                transcodingStatus={project.transcoding_status}
+                                subscriptionTier={subTier as 'free' | 'premium'}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-zinc-800">
+                                <Play className="w-8 h-8" />
+                              </div>
+                            )}
+                            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur text-white text-[10px] uppercase font-mono tracking-widest px-2 py-1 rounded-sm border border-white/10 pointer-events-none">
+                               Video
+                            </div>
+                            
+                            <div className="absolute top-3 right-3 flex flex-col items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                               <button 
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   openEditModal(project);
+                                 }}
+                                 className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-black transition pointer-events-auto"
+                                 title="Edit Metadata"
+                               >
+                                 <Edit className="w-3.5 h-3.5" />
+                               </button>
+                               <button 
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   handleDeleteProject(project.id);
+                                 }}
+                                 className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-red-500 hover:bg-red-500 hover:text-white transition pointer-events-auto"
+                                 title="Delete Project"
+                               >
+                                 {isDeletingId === project.id ? (
+                                   <div className="w-3 h-3 border border-red-500 border-t-transparent rounded-full animate-spin" />
+                                 ) : (
+                                   <Trash2 className="w-3.5 h-3.5" />
+                                 )}
+                               </button>
+                            </div>
+                          </div>
+                          <div className="p-6 flex-1 flex flex-col">
+                            <h3 className="text-lg font-bold truncate text-white mb-2">{project.title}</h3>
+                            <p className="text-zinc-500 text-sm line-clamp-2 font-light flex-1">{project.description || 'No metadata provided.'}</p>
+                            <div className="mt-6 flex items-center justify-between border-t border-zinc-900 pt-4">
+                               <div className="flex items-center gap-4 text-[11px] text-zinc-500 font-mono uppercase tracking-widest">
+                                <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /> {project.view_count || 0}</span>
+                                {(project.comments?.length > 0) && (
+                                  <span className="flex items-center gap-1.5 text-amber-400">
+                                    <MessageSquare className="w-3.5 h-3.5" /> {project.comments.length}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1.5 text-white/50">
+                                  {project.status === 'approved' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
+                                  {project.status || 'Published'}
+                                </span>
+                              </div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const reviewUrl = window.location.origin + `/review/${project.id}`;
+                                  navigator.clipboard.writeText(reviewUrl);
+                                  alert("Client Review Link copied to clipboard!");
+                                }}
+                                className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-1.5 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center gap-2"
+                              >
+                                <LinkIcon className="w-3 h-3" /> Share Review Link
+                              </button>
+                            </div>
+                          </div>
+                          <ProjectStoryTimeline
+                            projectId={project.id}
+                            projectTitle={project.title}
+                          />
+                        </motion.div>
+                      ));
+                    } else if (portfolio?.projects?.length > 0) {
+                      return (
+                        <div className="col-span-full py-20 flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl bg-[#050505]">
+                          <SlidersHorizontal className="w-6 h-6 text-zinc-600 mb-4" />
+                          <h3 className="text-lg font-bold text-white mb-1">No Matches Found</h3>
+                          <p className="text-zinc-500 text-sm font-light">Adjust your filters to find what you&apos;re looking for.</p>
+                          <button 
+                            onClick={() => { setProjectSearch(""); setFilterCategory("All"); setFilterStatus("All"); }}
+                            className="mt-6 text-[10px] font-mono uppercase tracking-widest text-white hover:underline"
+                          >
+                            Reset All Filters
+                          </button>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="col-span-full py-40 flex flex-col items-center justify-center border border-dashed border-zinc-800 rounded-2xl bg-[#050505]">
+                          <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mb-6">
+                            <UploadCloud className="w-6 h-6 text-zinc-500" />
+                          </div>
+                          <h3 className="text-xl font-bold text-white mb-2 tracking-tight">Empty Repository</h3>
+                          <p className="text-zinc-500 mb-8 text-center max-w-sm text-sm font-light">Your portfolio is currently blank. Ingest your first major edit to begin.</p>
+                          <button 
+                            onClick={() => setIsModalOpen(true)}
+                            className="px-6 py-3 border border-zinc-700 text-white text-xs uppercase tracking-widest font-bold rounded-sm hover:bg-white hover:text-black transition"
+                          >
+                            Initiate Upload
+                          </button>
+                        </div>
+                      );
+                    }
+                  })()}
                   </div>
                 </motion.div>
               )}
@@ -928,28 +1203,29 @@ function DashboardContent() {
               {activeTab === 'analytics' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-8">
                   {/* KPI Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     {(() => {
-                      const totalViews = portfolio.projects?.reduce((acc: number, p: any) => acc + (p.view_count || 0), 0) || 0;
-                      const avgViews = portfolio.projects?.length > 0 ? Math.round(totalViews / portfolio.projects.length) : 0;
-                      const verifiedCount = portfolio.projects?.filter((p: any) => p.is_verified).length || 0;
-                      const verificationRate = portfolio.projects?.length > 0 
-                        ? Math.round((verifiedCount / portfolio.projects.length) * 100) 
-                        : 0;
+                      const totalImpressions = portfolio.projects?.reduce((acc: number, p: any) => acc + (p.view_count || 0), 0) || 0;
+                      const profileViews = portfolio.view_count || 0;
+                      const inquiryCount = portfolio.inquiries?.length || 0;
+                      const conversionRate = profileViews > 0 
+                        ? ((inquiryCount / profileViews) * 100).toFixed(1)
+                        : "0.0";
 
                       return [
-                        { label: "Total Impressions", value: totalViews.toLocaleString(), growth: "+0.0%", detail: "All-time views" },
-                        { label: "Avg. Engagement", value: avgViews.toLocaleString(), growth: "+0.0%", detail: "Per asset" },
-                        { label: "Verification Score", value: `${verificationRate}%`, growth: "Strict", detail: "Proof of work" }
+                        { label: "Profile Views", value: profileViews.toLocaleString(), growth: "+0.0%", detail: "Portfolio visits" },
+                        { label: "Project Clicks", value: totalImpressions.toLocaleString(), growth: "+0.0%", detail: "All-time views" },
+                        { label: "Lead Inquiries", value: inquiryCount.toLocaleString(), growth: "Emails", detail: "Client outreach" },
+                        { label: "Conversion Rate", value: `${conversionRate}%`, growth: "Strict", detail: "Leads / Views" }
                       ].map((kpi, i) => (
                         <motion.div 
                           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
                           key={kpi.label} 
-                          className="bg-[#050505] border border-zinc-900 p-8 rounded-xl flex flex-col justify-between"
+                          className="bg-[#050505] border border-zinc-900 p-6 rounded-xl flex flex-col justify-between"
                         >
                           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-6">{kpi.label}</p>
-                          <div className="flex items-end justify-between">
-                            <h3 className="text-4xl font-black text-white tracking-tighter">{kpi.value}</h3>
+                          <div className="flex items-end justify-between gap-4">
+                            <h3 className="text-3xl font-black text-white tracking-tighter">{kpi.value}</h3>
                             <span className="text-[10px] font-mono tracking-widest text-zinc-600">{kpi.growth}</span>
                           </div>
                         </motion.div>
@@ -1025,12 +1301,158 @@ function DashboardContent() {
                 </motion.div>
               )}
 
+
+              {activeTab === 'reviews' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-8">
+                  {/* KPI Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                      { label: "Total Feedback", value: totalCommentCount, icon: <MessageSquare className="w-4 h-4" /> },
+                      { label: "Projects with Reviews", value: reviewsData.length, icon: <PlayCircle className="w-4 h-4" /> },
+                      { label: "Awaiting Action", value: reviewsData.filter((p: any) => p.project_status === 'needs_revision').length, icon: <AlertCircle className="w-4 h-4" /> },
+                    ].map((kpi, i) => (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
+                        key={kpi.label}
+                        className="bg-[#050505] border border-zinc-900 p-6 rounded-xl"
+                      >
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-zinc-500">{kpi.icon}</span>
+                          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">{kpi.label}</p>
+                        </div>
+                        <h3 className="text-3xl font-black text-white tracking-tighter">{kpi.value}</h3>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Reviews by Project */}
+                  {isReviewsLoading ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+                    </div>
+                  ) : reviewsData.length === 0 ? (
+                    <div className="bg-[#050505] border border-zinc-900 rounded-xl p-16 text-center">
+                      <div className="w-16 h-16 rounded-full border border-dashed border-zinc-700 flex items-center justify-center mx-auto mb-6">
+                        <MessageSquare className="w-6 h-6 text-zinc-600" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-2">No Client Feedback Yet</h3>
+                      <p className="text-zinc-500 text-sm font-light max-w-md mx-auto">
+                        Share review links with your clients from the Assets tab. When they leave timestamped comments, they&apos;ll appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    reviewsData.map((projectReview: any, pi: number) => (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: pi * 0.1 }}
+                        key={projectReview.project_id}
+                        className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden"
+                      >
+                        {/* Project Header */}
+                        <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
+                              <Play className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-white text-sm tracking-tight">{projectReview.project_title}</h4>
+                              <div className="flex items-center gap-3 mt-1">
+                                <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                                  projectReview.project_status === 'approved'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                    : projectReview.project_status === 'needs_revision'
+                                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                }`}>
+                                  {projectReview.project_status === 'approved' ? '✓ Approved' : projectReview.project_status === 'needs_revision' ? '⚠ Changes Requested' : '● In Review'}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-600">
+                                  {projectReview.comments.filter((c:any) => !c.is_resolved).length} active review{projectReview.comments.filter((c:any) => !c.is_resolved).length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const url = window.location.origin + `/review/${projectReview.project_id}`;
+                              window.open(url, '_blank');
+                            }}
+                            className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center gap-2"
+                          >
+                            <ExternalLink className="w-3 h-3" /> Open Review
+                          </button>
+                        </div>
+
+                        {/* Comments List */}
+                        <div className="divide-y divide-zinc-900/50">
+                          {projectReview.comments.map((comment: any) => (
+                            <div key={comment.id} className="p-5 px-6 flex items-start gap-4 hover:bg-zinc-900/30 transition group">
+                              <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase">
+                                  {comment.author_name?.charAt(0) || '?'}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3 mb-1">
+                                  <span className="text-xs font-bold text-white">{comment.author_name}</span>
+                                  {comment.timestamp != null && (
+                                    <span className="text-[10px] font-mono bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded flex items-center gap-1">
+                                      <Clock className="w-3 h-3" /> {(() => { const m = Math.floor(comment.timestamp / 60); const s = comment.timestamp % 60; return `${m}:${String(s).padStart(2, '0')}`; })()}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] font-mono text-zinc-700">
+                                    {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-zinc-300 font-light leading-relaxed">{comment.text}</p>
+                              </div>
+
+                              <div className="flex items-center gap-2 transition-opacity">
+                                {comment.is_resolved && (
+                                  <span className="text-[9px] font-black uppercase tracking-tighter text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 mr-2">
+                                    Resolved
+                                  </span>
+                                )}
+                                <button 
+                                  onClick={async () => {
+                                    await api.put(`/comments/${comment.id}`, { is_resolved: !comment.is_resolved });
+                                    fetchReviews();
+                                  }}
+                                  className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-2 ${
+                                    comment.is_resolved 
+                                      ? 'bg-zinc-800 text-zinc-500 hover:text-white' 
+                                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                                  }`}
+                                >
+                                  {comment.is_resolved ? 'Reopen' : 'Resolve'}
+                                </button>
+                                <button 
+                                  onClick={async () => {
+                                    if (confirm("Permanently delete this comment?")) {
+                                      await api.delete(`/comments/${comment.id}`);
+                                      fetchReviews();
+                                    }
+                                  }}
+                                  className="p-1.5 rounded hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition"
+                                  title="Delete Feedback"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </motion.div>
+              )}
+
               {activeTab === 'settings' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-[#050505] border border-zinc-900 rounded-xl p-8 lg:p-12 max-w-3xl">
                    <form onSubmit={handleUpdatePortfolio} className="space-y-10">
                       <div>
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Primary Domain</label>
-                        <input disabled type="text" value={portfolio.subdomain + ".yourplatform.com"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
+                        <input disabled type="text" value={portfolio.subdomain + ".foliohub.media"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-3">
@@ -1054,11 +1476,36 @@ function DashboardContent() {
                             </div>
                           )}
                         </div>
-                        <p className="text-[10px] text-zinc-600 font-mono mt-3 uppercase tracking-widest leading-relaxed">
-                          {subTier === 'free' 
-                            ? "Point your professional domain to FolioHub (PRO feature)." 
-                            : "Configure your CNAME records to point to our systems to activate."}
-                        </p>
+                        {subTier === 'free' ? (
+                          <p className="text-[10px] text-zinc-600 font-mono mt-3 uppercase tracking-widest leading-relaxed">
+                            Point your professional domain to FolioHub (PRO feature).
+                          </p>
+                        ) : (
+                          <div className="mt-3 space-y-3">
+                            <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest leading-relaxed">
+                              Configure your DNS with the following record to activate:
+                            </p>
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 font-mono text-xs space-y-2">
+                              <div className="flex items-center gap-3 text-zinc-400">
+                                <span className="text-[9px] uppercase tracking-widest text-zinc-600 w-12">Type</span>
+                                <span className="text-white font-bold">CNAME</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-zinc-400">
+                                <span className="text-[9px] uppercase tracking-widest text-zinc-600 w-12">Host</span>
+                                <span className="text-white">@ or www</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-zinc-400">
+                                <span className="text-[9px] uppercase tracking-widest text-zinc-600 w-12">Value</span>
+                                <span className="text-emerald-400 font-bold">foliohub.media</span>
+                              </div>
+                            </div>
+                            {portfolio.custom_domain && (
+                              <p className="text-[10px] text-emerald-500/70 font-mono uppercase tracking-widest flex items-center gap-1.5">
+                                <CheckCircle2 className="w-3 h-3" /> Domain saved. DNS propagation may take up to 48 hours.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <div>
@@ -1083,6 +1530,60 @@ function DashboardContent() {
                          <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Availability</label>
                          <input name="availability" type="text" defaultValue={portfolio.availability || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
                        </div>
+                     </div>
+                     <div className="pt-8 border-t border-zinc-900">
+                        <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand" /> Custom Branding</label>
+                        <p className="text-xs text-zinc-600 mb-6 font-light">Look like a brand, not just a random freelancer.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Logo URL (Optional)</label>
+                              <input name="logo_url" type="text" placeholder="https://..." defaultValue={portfolio.logo_url || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Accent Color (Hex)</label>
+                              <div className="flex gap-4">
+                                <input name="accent_color" type="color" defaultValue={portfolio.accent_color || '#ffffff'} className="w-12 h-12 rounded bg-transparent border-none cursor-pointer" />
+                                <input type="text" placeholder="#ffffff" value={portfolio.accent_color || '#ffffff'} disabled className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 font-light outline-none" />
+                              </div>
+                           </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Typography Style</label>
+                              <select name="typography" defaultValue={portfolio.typography || 'sans'} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors">
+                                 <option value="sans" className="bg-black text-white">Sans-serif (Modern)</option>
+                                 <option value="serif" className="bg-black text-white">Serif (Elegant)</option>
+                                 <option value="mono" className="bg-black text-white">Monospace (Tech)</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Intro Animation</label>
+                              <select name="intro_style" defaultValue={portfolio.intro_style || 'default'} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors">
+                                 <option value="default" className="bg-black text-white">Default Fade</option>
+                                 <option value="cinematic" className="bg-black text-white">Cinematic Slide</option>
+                                 <option value="glitch" className="bg-black text-white">Glitch Effect</option>
+                                 <option value="none" className="bg-black text-white">None (Instant Load)</option>
+                              </select>
+                           </div>
+                        </div>
+                     </div>
+                     <div className="pt-8 border-t border-zinc-900">
+                        <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Social Proof / Trust Builders</label>
+                        <p className="text-xs text-zinc-600 mb-6 font-light">Highlight your biggest milestones to convert high-ticket clients instantly.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Headline / Milestone</label>
+                              <input name="social_proof_headline" type="text" placeholder='e.g., "Edited shorts that reached 5M+ views"' defaultValue={portfolio.social_proof_headline || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Platform Rating</label>
+                              <input name="platform_rating" type="text" placeholder="e.g., 5.0 on Fiverr (100+ Reviews)" defaultValue={portfolio.platform_rating || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                           </div>
+                        </div>
+                        <div>
+                           <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Brands / Creators Worked With (comma separated)</label>
+                           <input name="brands_worked_with" type="text" placeholder="Nike, MrBeast, RedBull" defaultValue={portfolio.brands_worked_with || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                        </div>
                      </div>
                      <div className="pt-8 border-t border-zinc-900">
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Skill Heatmap Metrics (0-100)</label>
@@ -1112,6 +1613,9 @@ function DashboardContent() {
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Showreel & Connect</label>
                         <div className="space-y-6">
                            <input name="showreel_url" type="text" placeholder="Showreel YouTube/Vimeo ID" defaultValue={portfolio.showreel_url || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                           <input name="contact_email" type="email" placeholder="Public Contact Email" defaultValue={portfolio.contact_email || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                           <input name="whatsapp_number" type="text" placeholder="WhatsApp Number (incl. country code)" defaultValue={portfolio.whatsapp_number || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
+                           <input name="fiverr_url" type="text" placeholder="Fiverr / Upwork URL" defaultValue={portfolio.fiverr_url || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
                            <input name="youtube_url" type="text" placeholder="YouTube Channel URL" defaultValue={portfolio.youtube_url || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
                            <input name="instagram_url" type="text" placeholder="Instagram URL" defaultValue={portfolio.instagram_url || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
                            <input name="booking_link" type="text" placeholder="Booking Link (Calendly)" defaultValue={portfolio.booking_link || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
@@ -1122,28 +1626,54 @@ function DashboardContent() {
                         <div className="bg-black border border-zinc-800 p-6 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                            <div>
                               <h4 className="font-bold text-white mb-1">Two-Factor Authentication</h4>
-                              <p className="text-sm text-zinc-500">Require an email code for all unrecognized studio accesses.</p>
+                              <p className="text-sm text-zinc-500">Require a custom security PIN for all studio accesses.</p>
                            </div>
-                           <button 
-                             disabled={twoFactorEnabled || twoFactorLoading}
-                             onClick={async () => {
-                               setTwoFactorLoading(true);
-                               try {
-                                 await api.post('/enable-2fa');
-                                 setTwoFactorEnabled(true);
-                               } catch(e) {
-                                 console.error("2FA Error", e);
-                               } finally {
-                                 setTwoFactorLoading(false);
-                               }
-                             }}
-                             className={`w-full sm:w-auto px-6 py-3 border text-[11px] uppercase tracking-widest font-bold transition flex items-center justify-center min-w-[140px]
-                                ${twoFactorEnabled 
-                                  ? 'border-green-500/50 bg-green-500/10 text-green-400 cursor-default' 
-                                  : 'border-zinc-700 text-white hover:bg-white hover:text-black cursor-pointer'}`}
-                           >
-                             {twoFactorEnabled ? 'Active' : twoFactorLoading ? 'Processing...' : 'Enable 2FA'}
-                           </button>
+                           <div className="flex flex-wrap gap-4 w-full sm:w-auto">
+                              {twoFactorEnabled ? (
+                                <>
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      setTwoFactorModalType('edit');
+                                      setTwoFactorModalError('');
+                                      setTwoFactorModalPassword('');
+                                      setTwoFactorModalCode('');
+                                      setShow2faSetupModal(true);
+                                    }}
+                                    className="w-full sm:w-auto px-6 py-3 border border-zinc-700 text-white hover:bg-white hover:text-black text-[11px] uppercase tracking-widest font-bold transition flex items-center justify-center min-w-[120px]"
+                                  >
+                                    Edit PIN
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      setTwoFactorModalType('disable');
+                                      setTwoFactorModalError('');
+                                      setTwoFactorModalPassword('');
+                                      setTwoFactorModalCode('');
+                                      setShow2faSetupModal(true);
+                                    }}
+                                    className="w-full sm:w-auto px-6 py-3 border border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white text-[11px] uppercase tracking-widest font-bold transition flex items-center justify-center min-w-[120px]"
+                                  >
+                                    Disable 2FA
+                                  </button>
+                                </>
+                              ) : (
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    setTwoFactorModalType('enable');
+                                    setTwoFactorModalError('');
+                                    setTwoFactorModalPassword('');
+                                    setTwoFactorModalCode('');
+                                    setShow2faSetupModal(true);
+                                  }}
+                                  className="w-full sm:w-auto px-6 py-3 border border-zinc-700 text-white hover:bg-white hover:text-black text-[11px] uppercase tracking-widest font-bold transition flex items-center justify-center min-w-[140px]"
+                                >
+                                  Enable 2FA
+                                </button>
+                              )}
+                            </div>
                         </div>
                      </div>
 
@@ -1451,12 +1981,63 @@ function DashboardContent() {
                       disabled={isUploading}
                     >
                       <option value="general" className="bg-black text-white">General</option>
-                      <option value="youtube" className="bg-black text-white">YouTube</option>
-                      <option value="commercial" className="bg-black text-white">Commercials / Ads</option>
-                      <option value="documentary" className="bg-black text-white">Documentary</option>
-                      <option value="reels" className="bg-black text-white">Short Form / Reels</option>
+                      <option value="Gaming edits" className="bg-black text-white">Gaming edits</option>
+                      <option value="Commercial ads" className="bg-black text-white">Commercial ads</option>
+                      <option value="YouTube videos" className="bg-black text-white">YouTube videos</option>
+                      <option value="Cinematic edits" className="bg-black text-white">Cinematic edits</option>
+                      <option value="TikTok/Reels" className="bg-black text-white">TikTok/Reels</option>
+                      <option value="Documentary" className="bg-black text-white">Documentary</option>
+                      <option value="Wedding edits" className="bg-black text-white">Wedding edits</option>
+                      <option value="Motion graphics" className="bg-black text-white">Motion graphics</option>
                     </select>
                   </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Project Status</label>
+                    <select 
+                      className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base sm:text-lg outline-none transition-colors text-white font-light"
+                      value={uploadStatus}
+                      onChange={(e) => setUploadStatus(e.target.value)}
+                      disabled={isUploading}
+                    >
+                      <option value="draft" className="bg-black text-amber-500">Draft (Client Review)</option>
+                      <option value="needs_revision" className="bg-black text-red-500">Needs Revision</option>
+                      <option value="approved" className="bg-black text-emerald-500">Approved</option>
+                      <option value="published" className="bg-black text-white">Published</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 col-span-1 sm:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Smart Tags</label>
+                     <button 
+                       type="button"
+                       onClick={(e) => {
+                         e.preventDefault();
+                         const textToAnalyze = `${uploadTitle} ${uploadDesc} ${uploadCategory}`.toLowerCase();
+                         const potentialTags = [];
+                         if (textToAnalyze.includes('game') || textToAnalyze.includes('gaming')) potentialTags.push('Gaming');
+                         if (textToAnalyze.includes('cinematic')) potentialTags.push('Cinematic');
+                         if (textToAnalyze.includes('anime')) potentialTags.push('Anime');
+                         if (textToAnalyze.includes('ad') || textToAnalyze.includes('commercial')) potentialTags.push('Commercial');
+                         if (textToAnalyze.includes('fast')) potentialTags.push('Fast-Paced');
+                         
+                         if (potentialTags.length === 0) potentialTags.push('High-Energy', 'Storytelling'); // Default simulated tags
+                         setUploadTags(potentialTags.join(', '));
+                       }}
+                       className="text-[10px] bg-zinc-900 border border-zinc-700 px-3 py-1.5 rounded uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition text-zinc-300"
+                     >
+                       <Sparkles className="w-3 h-3 text-emerald-400" /> Auto-Tag with AI
+                     </button>
+                  </div>
+                  <input 
+                    type="text" 
+                    className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-base outline-none transition-colors text-white placeholder-zinc-500 font-medium"
+                    value={uploadTags}
+                    onChange={(e) => setUploadTags(e.target.value)}
+                    disabled={isUploading}
+                    placeholder="Gaming, Cinematic, Fast-Paced (Comma separated)"
+                  />
+                </div>
                   <div className="space-y-1">
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Your Role</label>
                     <input 
@@ -1481,6 +2062,74 @@ function DashboardContent() {
                   </div>
                 </div>
                 <div className="pt-6 border-t border-zinc-900 space-y-6">
+                   <div className="space-y-4">
+                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400 flex items-center gap-2">
+                       <Activity className="w-4 h-4 text-emerald-500" /> Hybrid Analytics Engine
+                     </label>
+                     <p className="text-[10px] text-zinc-500 font-light mb-4">
+                        Auto-import public data from a link, then manually add hidden metrics and strategy notes.
+                     </p>
+                     
+                     <div className="flex gap-2">
+                       <input 
+                          type="text" 
+                          className="flex-1 bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" 
+                          placeholder="Paste YouTube, TikTok, or Instagram link..." 
+                          value={sourceLink} 
+                          onChange={(e) => setSourceLink(e.target.value)} 
+                          disabled={isUploading} 
+                       />
+                       <button type="button" className="px-4 py-2 bg-zinc-800 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-700 transition shrink-0" disabled={isUploading} onClick={() => alert('Syncing public metrics... (Placeholder for API integration)')}>
+                         Auto-Sync
+                       </button>
+                     </div>
+
+                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                       <div className="space-y-1">
+                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Views</label>
+                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricViews} onChange={(e) => setMetricViews(e.target.value)} disabled={isUploading} placeholder="e.g. 5.2M" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Likes</label>
+                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricLikes} onChange={(e) => setMetricLikes(e.target.value)} disabled={isUploading} placeholder="e.g. 100K" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Comments</label>
+                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricComments} onChange={(e) => setMetricComments(e.target.value)} disabled={isUploading} placeholder="e.g. 5K" />
+                       </div>
+                     </div>
+
+                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                       <div className="space-y-1">
+                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-emerald-500">Retention (Hidden)</label>
+                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricRetention} onChange={(e) => setMetricRetention(e.target.value)} disabled={isUploading} placeholder="e.g. 78%" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-emerald-500">CTR (Hidden)</label>
+                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricCtr} onChange={(e) => setMetricCtr(e.target.value)} disabled={isUploading} placeholder="e.g. 12.4%" />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-emerald-500">Watch Time (Hidden)</label>
+                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricWatchTime} onChange={(e) => setMetricWatchTime(e.target.value)} disabled={isUploading} placeholder="e.g. 100K Hrs" />
+                       </div>
+                     </div>
+
+                     <div className="space-y-4 pt-4 border-t border-zinc-900">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Client Goals</label>
+                          <textarea className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700 h-16 resize-none" value={clientGoals} onChange={(e) => setClientGoals(e.target.value)} disabled={isUploading} placeholder="e.g. Increase male demographic 18-24 by 20%" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Strategy Notes</label>
+                          <textarea className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700 h-16 resize-none" value={strategyNotes} onChange={(e) => setStrategyNotes(e.target.value)} disabled={isUploading} placeholder="e.g. Used fast-paced J-cuts in the first 3 seconds to hook viewers..." />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Monetization Results</label>
+                          <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={monetizationResults} onChange={(e) => setMonetizationResults(e.target.value)} disabled={isUploading} placeholder="e.g. Generated $15,000 in sponsor sales" />
+                        </div>
+                     </div>
+                   </div>
+
                    <div>
                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Proof of Work: Timeline Breakdown (Optional)</label>
                      <textarea 
@@ -1580,39 +2229,35 @@ function DashboardContent() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Final Edit Video</label>
-                    {!editingProject ? (
-                      <div className="relative group mt-2">
-                        <input 
-                          type="file" 
-                          accept="video/*"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                          required
-                          disabled={isUploading}
-                        />
-                        <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
-                          {selectedFile ? (
-                            <>
-                              <p className="text-sm font-medium text-white max-w-[200px] truncate">{selectedFile.name}</p>
-                              <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">Selected</p>
-                              <button 
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFile(null); }}
-                                className="absolute top-2 right-2 p-1.5 bg-zinc-800/80 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition z-20"
-                                title="Remove file"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </>
-                          ) : (
-                            <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition text-center">Drag & Drop or Click to Upload</p>
-                          )}
-                        </div>
+                    <div className="relative group mt-2">
+                      <input 
+                        type="file" 
+                        accept="video/*"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        disabled={isUploading}
+                      />
+                      <div className={`w-full border-2 border-dashed p-6 flex flex-col items-center justify-center transition ${selectedFile ? 'border-white bg-white/5' : 'border-zinc-800 bg-transparent group-hover:border-zinc-600'}`}>
+                        {selectedFile ? (
+                          <>
+                            <p className="text-sm font-medium text-white max-w-[200px] truncate">{selectedFile.name}</p>
+                            <p className="text-[10px] text-zinc-500 mt-2 font-mono uppercase tracking-widest">New Main Video Selected</p>
+                            <button 
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedFile(null); }}
+                              className="absolute top-2 right-2 p-1.5 bg-zinc-800/80 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition z-20"
+                              title="Remove file"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-center">
+                            <p className="text-[10px] uppercase font-mono tracking-widest text-zinc-500 group-hover:text-white transition">Drag & Drop or Click to Upload</p>
+                            {editingProject && <p className="text-[8px] text-zinc-600 mt-1 uppercase tracking-widest">Leave empty to keep existing version</p>}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="mt-2 p-4 border border-zinc-800 bg-zinc-900/30 rounded-lg flex items-center justify-center text-center">
-                        <p className="text-[10px] text-zinc-600 uppercase font-mono tracking-widest">Main video cannot be replaced here. Re-upload as new project if needed.</p>
-                      </div>
-                    )}
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -1828,6 +2473,76 @@ function DashboardContent() {
                       {managementLoading ? 'Commencing Wipe...' : 'Permanently Shred Account'}
                    </button>
                    <button type="button" onClick={() => setShowDeleteAccountModal(false)} className="w-full text-zinc-600 text-[10px] uppercase tracking-widest hover:text-white transition py-2">Return to Safety</button>
+                </form>
+             </motion.div>
+          </div>
+        )}
+
+        {show2faSetupModal && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShow2faSetupModal(false)} className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0a0a0a] border border-zinc-800 p-8 sm:p-12 rounded-2xl max-w-md w-full shadow-2xl font-sans">
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  {twoFactorModalType === 'enable' && 'Enable Two-Factor'}
+                  {twoFactorModalType === 'disable' && 'Disable Two-Factor'}
+                  {twoFactorModalType === 'edit' && 'Update Security PIN'}
+                </h3>
+                <p className="text-zinc-500 text-sm mb-8">
+                  {twoFactorModalType === 'enable' && 'Set a custom PIN to secure access. Verifying your password is required.'}
+                  {twoFactorModalType === 'disable' && 'Verify your password to disable two-factor authentication.'}
+                  {twoFactorModalType === 'edit' && 'Verify your password and enter a new two-factor security PIN.'}
+                </p>
+                <form onSubmit={handleTwoFactorAction} className="space-y-6">
+                   <div className="space-y-1">
+                      <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Confirm Password</label>
+                      <input 
+                        type="password" 
+                        required 
+                        value={twoFactorModalPassword}
+                        onChange={(e) => setTwoFactorModalPassword(e.target.value)}
+                        className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors" 
+                      />
+                   </div>
+
+                   {(twoFactorModalType === 'enable' || twoFactorModalType === 'edit') && (
+                     <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Custom Security PIN (min 4 chars)</label>
+                        <input 
+                          type="password" 
+                          required 
+                          value={twoFactorModalCode}
+                          onChange={(e) => setTwoFactorModalCode(e.target.value)}
+                          className="w-full bg-transparent border-b border-zinc-800 py-2 text-white outline-none focus:border-white transition-colors font-mono tracking-widest" 
+                        />
+                     </div>
+                   )}
+
+                   {twoFactorModalError && (
+                      <div className="p-3 border border-red-500/20 bg-red-500/5 text-red-500 text-xs font-mono uppercase tracking-widest rounded-lg">
+                        {twoFactorModalError}
+                      </div>
+                   )}
+
+                   <button 
+                     type="submit" 
+                     disabled={managementLoading} 
+                     className="w-full py-4 bg-white text-black font-bold uppercase tracking-widest text-[11px] hover:bg-zinc-200 transition"
+                   >
+                     {managementLoading ? 'Processing...' : (
+                       <>
+                         {twoFactorModalType === 'enable' && 'Activate 2FA'}
+                         {twoFactorModalType === 'disable' && 'Disable 2FA'}
+                         {twoFactorModalType === 'edit' && 'Update PIN'}
+                       </>
+                     )}
+                   </button>
+                   <button 
+                     type="button" 
+                     onClick={() => setShow2faSetupModal(false)} 
+                     className="w-full text-zinc-600 text-[10px] uppercase tracking-widest hover:text-white transition"
+                   >
+                     Abort
+                   </button>
                 </form>
              </motion.div>
           </div>

@@ -34,6 +34,12 @@ class Portfolio(Base):
     bio = Column(Text, nullable=True)
     theme_preference = Column(String, default="cinematic-dark")
     
+    # Custom Branding
+    logo_url = Column(String, nullable=True)
+    accent_color = Column(String, default="#ffffff")
+    typography = Column(String, default="sans")
+    intro_style = Column(String, default="default")
+    
     # Portfolio Extensions
     showreel_url = Column(String, nullable=True)
     skills = Column(String, nullable=True)
@@ -42,6 +48,11 @@ class Portfolio(Base):
     fixed_packages = Column(Text, nullable=True)
     hourly_rate = Column(String, nullable=True)
     booking_link = Column(String, nullable=True)
+    
+    # Easy Contact / Hiring System
+    whatsapp_number = Column(String, nullable=True)
+    contact_email = Column(String, nullable=True)
+    fiverr_url = Column(String, nullable=True)
     
     # Skill Heatmap
     skill_cutting = Column(Integer, default=50)
@@ -55,6 +66,18 @@ class Portfolio(Base):
     # Style Fingerprint — computed from uploaded videos
     style_fingerprint = Column(JSON, nullable=True)
     fingerprint_computed_at = Column(DateTime, nullable=True)
+
+    # Social Proof
+    social_proof_headline = Column(String, nullable=True) # e.g., "Edited shorts that reached 5M+ views"
+    brands_worked_with = Column(String, nullable=True) # comma separated
+    platform_rating = Column(String, nullable=True) # e.g., "5.0 on Fiverr (100+ Reviews)"
+
+    # Analytics
+    view_count = Column(Integer, default=0)
+
+    # Rework & Agreements
+    revision_policy = Column(Text, nullable=True)
+    agreement_url = Column(String, nullable=True)
 
     # Relationships
     owner = relationship("User", back_populates="portfolio")
@@ -75,10 +98,28 @@ class Project(Base):
     tools_used = Column(String, nullable=True)
     category = Column(String, default="general", nullable=True)
     
+    # AI Tagging and Client Review
+    tags = Column(String, nullable=True) # Comma-separated AI generated tags
+    status = Column(String, default="published") # "draft", "published", "needs_revision", "approved"
+    
     # Proof of Work System
     timeline_breakdown = Column(Text, nullable=True)
     project_file_url = Column(String, nullable=True)
     is_verified = Column(Boolean, default=False)
+
+    # Performance Metrics (Results)
+    metric_views = Column(String, nullable=True)
+    metric_likes = Column(String, nullable=True)
+    metric_comments = Column(String, nullable=True)
+    metric_retention = Column(String, nullable=True)
+    metric_ctr = Column(String, nullable=True)
+    metric_watch_time = Column(String, nullable=True)
+    
+    # Hybrid Model Additions
+    source_link = Column(String, nullable=True)
+    client_goals = Column(Text, nullable=True)
+    strategy_notes = Column(Text, nullable=True)
+    monetization_results = Column(Text, nullable=True)
 
     # Media Links (Will point to your AWS S3 buckets)
     media_url = Column(String, nullable=True) 
@@ -94,6 +135,7 @@ class Project(Base):
     # Relationships
     portfolio = relationship("Portfolio", back_populates="projects")
     story     = relationship("ProjectStory", back_populates="project", uselist=False, cascade="all, delete-orphan")
+    comments  = relationship("ProjectComment", back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectStory(Base):
@@ -144,6 +186,20 @@ class Inquiry(Base):
 
     # Relationship
     portfolio = relationship("Portfolio", back_populates="inquiries")
+
+class ProjectComment(Base):
+    """Client feedback and timestamps for Draft projects"""
+    __tablename__ = "project_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    timestamp = Column(Integer, nullable=True) # Time in seconds on the video player
+    text = Column(Text, nullable=False)
+    author_name = Column(String, nullable=True)
+    is_resolved = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    project = relationship("Project", back_populates="comments")
 
 class SignupOTP(Base):
     __tablename__ = "signup_otps"

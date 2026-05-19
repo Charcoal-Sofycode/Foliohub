@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Loader2, Mail, ShieldCheck, Lock, CheckCircle2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, ShieldCheck, Lock, CheckCircle2, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import api from '@/lib/api';
 import FolioLogo from '@/components/FolioLogo';
 
@@ -90,6 +90,8 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp]                 = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError]             = useState('');
   const [isLoading, setIsLoading]     = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -364,20 +366,29 @@ export default function ForgotPasswordPage() {
                            className="text-xs uppercase tracking-[0.18em] font-semibold text-zinc-500">
                       New Password
                     </label>
-                    <input
-                      id="new-password"
-                      type="password"
-                      value={newPassword}
-                      onChange={e => { setNewPassword(e.target.value); clearError(); }}
-                      required
-                      autoFocus
-                      minLength={8}
-                      className="w-full bg-zinc-900/60 border border-zinc-800 focus:border-zinc-500
-                                 rounded-xl px-4 py-3.5 text-sm outline-none transition-all duration-200
-                                 placeholder-zinc-700 tracking-wider
-                                 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.05)]"
-                      placeholder="Minimum 8 characters"
-                    />
+                    <div className="relative">
+                      <input
+                        id="new-password"
+                        type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={e => { setNewPassword(e.target.value); clearError(); }}
+                        required
+                        autoFocus
+                        minLength={8}
+                        className="w-full bg-zinc-900/60 border border-zinc-800 focus:border-zinc-500
+                                   rounded-xl px-4 pr-12 py-3.5 text-sm outline-none transition-all duration-200
+                                   placeholder-zinc-700 tracking-wider
+                                   focus:shadow-[0_0_0_3px_rgba(255,255,255,0.05)]"
+                        placeholder="Minimum 8 characters"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+                      >
+                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -385,18 +396,27 @@ export default function ForgotPasswordPage() {
                            className="text-xs uppercase tracking-[0.18em] font-semibold text-zinc-500">
                       Confirm Password
                     </label>
-                    <input
-                      id="confirm-password"
-                      type="password"
-                      value={confirmPass}
-                      onChange={e => { setConfirmPass(e.target.value); clearError(); }}
-                      required
-                      className="w-full bg-zinc-900/60 border border-zinc-800 focus:border-zinc-500
-                                 rounded-xl px-4 py-3.5 text-sm outline-none transition-all duration-200
-                                 placeholder-zinc-700 tracking-wider
-                                 focus:shadow-[0_0_0_3px_rgba(255,255,255,0.05)]"
-                      placeholder="••••••••"
-                    />
+                    <div className="relative">
+                      <input
+                        id="confirm-password"
+                        type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPass}
+                        onChange={e => { setConfirmPass(e.target.value); clearError(); }}
+                        required
+                        className="w-full bg-zinc-900/60 border border-zinc-800 focus:border-zinc-500
+                                   rounded-xl px-4 pr-12 py-3.5 text-sm outline-none transition-all duration-200
+                                   placeholder-zinc-700 tracking-wider
+                                   focus:shadow-[0_0_0_3px_rgba(255,255,255,0.05)]"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Password strength hint */}

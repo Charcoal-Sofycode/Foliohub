@@ -224,13 +224,8 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 2FA CHECK — uses cryptographically-secure random code
+    # 2FA CHECK
     if user.is_2fa_enabled:
-        code = f"{secrets.randbelow(1000000):06d}"
-        user.two_factor_code = code
-        db.commit()
-        # Dispatch verification email in background to prevent UI hang
-        background_tasks.add_task(email_utils.send_2fa_email, user.email, code)
         return {"access_token": None, "token_type": "bearer", "requires_2fa": True}
 
 
@@ -242,10 +237,6 @@ def verify_2fa(data: schemas.TwoFactorVerify, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == data.email).first()
     if not user or user.two_factor_code != data.code:
         raise HTTPException(status_code=400, detail="Invalid 2FA code")
-    
-    # Clear the code and generate token
-    user.two_factor_code = None
-    db.commit()
     
     access_token = auth.create_access_token(data={"sub": user.email, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -266,7 +257,7 @@ def update_user_email(data: schemas.UserUpdateEmail, db: Session = Depends(get_d
 def update_user_password(data: schemas.UserUpdatePassword, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Verify current password
     if not auth.verify_password(data.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Current password verification failed.")
+        raise HTTPException(status_code=403, detail="Current password verification failed.")
     
     # Update to new password
     validate_password_strength(data.new_password)
@@ -278,7 +269,7 @@ def update_user_password(data: schemas.UserUpdatePassword, db: Session = Depends
 def delete_user_account(data: schemas.UserDelete, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # 1. Final verification
     if not auth.verify_password(data.password, current_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Authentication failed. Account deletion aborted.")
+        raise HTTPException(status_code=403, detail="Authentication failed. Account deletion aborted.")
 
     # 2. Collect ALL S3 keys for deletion
     keys_to_delete = []
@@ -377,10 +368,34 @@ def export_user_data(db: Session = Depends(get_db), current_user: models.User = 
     return export_data
 
 @app.post("/enable-2fa")
-def enable_2fa(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def enable_2fa(data: schemas.Enable2FARequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not auth.verify_password(data.password, current_user.hashed_password):
+        raise HTTPException(status_code=403, detail="Authentication failed. Incorrect password.")
+    if not data.code or len(data.code) < 4:
+        raise HTTPException(status_code=400, detail="PIN/code must be at least 4 characters long.")
     current_user.is_2fa_enabled = True
+    current_user.two_factor_code = data.code
     db.commit()
-    return {"message": "2FA strictly enabled."}
+    return {"message": "2FA successfully enabled."}
+
+@app.post("/disable-2fa")
+def disable_2fa(data: schemas.Disable2FARequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not auth.verify_password(data.password, current_user.hashed_password):
+        raise HTTPException(status_code=403, detail="Authentication failed. Incorrect password.")
+    current_user.is_2fa_enabled = False
+    current_user.two_factor_code = None
+    db.commit()
+    return {"message": "2FA successfully disabled."}
+
+@app.post("/edit-2fa")
+def edit_2fa(data: schemas.Edit2FARequest, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if not auth.verify_password(data.password, current_user.hashed_password):
+        raise HTTPException(status_code=403, detail="Authentication failed. Incorrect password.")
+    if not data.new_code or len(data.new_code) < 4:
+        raise HTTPException(status_code=400, detail="PIN/code must be at least 4 characters long.")
+    current_user.two_factor_code = data.new_code
+    db.commit()
+    return {"message": "2FA PIN successfully updated."}
 
 @app.post("/forgot-password")
 @limiter.limit("3/minute")
@@ -550,6 +565,19 @@ def update_my_portfolio(
     if 'custom_domain' in update_dict and update_dict['custom_domain']:
         if current_user.subscription_tier != 'premium':
             raise HTTPException(status_code=403, detail="Custom domain mapping is a Premium feature. Please upgrade your plan.")
+        
+        # Normalize the domain: strip protocol, whitespace, trailing slash, lowercase
+        raw = update_dict['custom_domain']
+        clean = raw.strip().lower().replace("https://", "").replace("http://", "").replace("www.", "").rstrip("/")
+        update_dict['custom_domain'] = clean
+        
+        # Check for duplicate domain mapping
+        existing = db.query(models.Portfolio).filter(
+            models.Portfolio.custom_domain == clean,
+            models.Portfolio.id != portfolio.id
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail=f"The domain '{clean}' is already mapped to another portfolio.")
 
     for key, value in update_dict.items():
         setattr(portfolio, key, value)
@@ -631,6 +659,18 @@ def create_project(
     raw_media_key: str = Form(None),
     project_file_key: str = Form(None),
     thumbnail_key: str = Form(None),
+    metric_views: str = Form(None),
+    metric_retention: str = Form(None),
+    metric_ctr: str = Form(None),
+    metric_watch_time: str = Form(None),
+    metric_likes: str = Form(None),
+    metric_comments: str = Form(None),
+    source_link: str = Form(None),
+    client_goals: str = Form(None),
+    strategy_notes: str = Form(None),
+    monetization_results: str = Form(None),
+    tags: str = Form(None),
+    status: str = Form("published"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -710,7 +750,19 @@ def create_project(
         thumbnail_url=thumbnail_url,
         timeline_breakdown=timeline_breakdown,
         project_file_url=project_file_url,
-        is_verified=is_verified
+        is_verified=is_verified,
+        metric_views=metric_views,
+        metric_retention=metric_retention,
+        metric_ctr=metric_ctr,
+        metric_watch_time=metric_watch_time,
+        metric_likes=metric_likes,
+        metric_comments=metric_comments,
+        source_link=source_link,
+        client_goals=client_goals,
+        strategy_notes=strategy_notes,
+        monetization_results=monetization_results,
+        tags=tags,
+        status=status
     )
     
     db.add(new_project)
@@ -758,6 +810,132 @@ def delete_project(
     return {"message": "Project deleted successfully"}
 
 
+@app.post("/projects/{project_id}/comments", response_model=schemas.ProjectCommentResponse)
+def create_project_comment(
+    project_id: int,
+    comment: schemas.ProjectCommentCreate,
+    db: Session = Depends(get_db)
+):
+    # Public route, anyone with the draft link can comment
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    new_comment = models.ProjectComment(
+        project_id=project_id,
+        timestamp=comment.timestamp,
+        text=comment.text,
+        author_name=comment.author_name
+    )
+    db.add(new_comment)
+    db.commit()
+    db.refresh(new_comment)
+    return new_comment
+
+@app.get("/projects/{project_id}/comments", response_model=list[schemas.ProjectCommentResponse])
+def get_project_comments(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    # Public route, anyone with the draft link can see comments
+    comments = db.query(models.ProjectComment).filter(models.ProjectComment.project_id == project_id).all()
+    return comments
+
+@app.put("/comments/{comment_id}", response_model=schemas.ProjectCommentResponse)
+def update_comment(
+    comment_id: int,
+    update: schemas.ProjectCommentUpdate,
+    db: Session = Depends(get_db)
+):
+    comment = db.query(models.ProjectComment).filter(models.ProjectComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if update.text is not None:
+        comment.text = update.text
+    if update.is_resolved is not None:
+        comment.is_resolved = update.is_resolved
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+@app.delete("/comments/{comment_id}")
+def delete_comment(
+    comment_id: int,
+    db: Session = Depends(get_db)
+):
+    comment = db.query(models.ProjectComment).filter(models.ProjectComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    db.delete(comment)
+    db.commit()
+    return {"message": "Comment deleted successfully"}
+
+# Editor endpoint: get all comments across all their projects
+@app.get("/my-reviews")
+def get_my_reviews(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        return []
+    
+    projects = db.query(models.Project).filter(models.Project.portfolio_id == portfolio.id).all()
+    result = []
+    for project in projects:
+        comments = db.query(models.ProjectComment).filter(
+            models.ProjectComment.project_id == project.id
+        ).order_by(models.ProjectComment.created_at.desc()).all()
+        if comments:
+            result.append({
+                "project_id": project.id,
+                "project_title": project.title,
+                "project_status": project.status or "published",
+                "thumbnail_url": project.thumbnail_url,
+                "comments": [
+                    {
+                        "id": c.id,
+                        "project_id": c.project_id,
+                        "timestamp": c.timestamp,
+                        "text": c.text,
+                        "author_name": c.author_name,
+                        "is_resolved": c.is_resolved,
+                        "created_at": c.created_at.isoformat() if c.created_at else None,
+                    }
+                    for c in comments
+                ]
+            })
+    return result
+
+# Public endpoint: client can approve or request changes from review page
+@app.put("/projects/{project_id}/status")
+def update_project_status(
+    project_id: int,
+    status_update: dict,
+    db: Session = Depends(get_db)
+):
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    new_status = status_update.get("status")
+    if new_status not in ["draft", "needs_revision", "approved", "published"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    project.status = new_status
+    db.commit()
+    return {"message": f"Status updated to {new_status}", "status": new_status}
+
+@app.get("/projects/{project_id}", response_model=schemas.ProjectResponse)
+def get_single_project(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    # Public route for draft review links
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
 @app.get("/portfolios/{subdomain}/projects", response_model=list[schemas.ProjectResponse])
 def get_portfolio_projects(subdomain: str, db: Session = Depends(get_db)):
     # This is a PUBLIC route so anyone visiting the creator's portfolio can see their work!
@@ -783,6 +961,39 @@ def get_public_portfolio(subdomain: str, db: Session = Depends(get_db)):
     if not portfolio:
         raise HTTPException(status_code=404, detail="Portfolio not found")
     
+    # Track view
+    portfolio.view_count = (portfolio.view_count or 0) + 1
+    db.commit()
+    db.refresh(portfolio)
+
+    # Map subscription tier from owner to response
+    portfolio.subscription_tier = portfolio.owner.subscription_tier
+    
+    return portfolio
+
+@app.get("/portfolios/by-domain/{domain}", response_model=schemas.PortfolioResponse)
+def get_portfolio_by_custom_domain(domain: str, db: Session = Depends(get_db)):
+    """Resolve a portfolio by its custom domain (e.g., chanuka.com).
+    Used by the frontend middleware to serve portfolios on custom domains."""
+    # Normalize: strip protocol prefixes, trailing slashes, whitespace
+    clean_domain = domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+    
+    portfolio = db.query(models.Portfolio).filter(
+        models.Portfolio.custom_domain == clean_domain
+    ).first()
+    
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="No portfolio is mapped to this domain.")
+    
+    # Verify the owner is still on premium (domain could've been set before downgrade)
+    if portfolio.owner.subscription_tier != "premium":
+        raise HTTPException(status_code=403, detail="Custom domain is inactive. The portfolio owner's premium subscription has expired.")
+    
+    # Track view
+    portfolio.view_count = (portfolio.view_count or 0) + 1
+    db.commit()
+    db.refresh(portfolio)
+
     # Map subscription tier from owner to response
     portfolio.subscription_tier = portfolio.owner.subscription_tier
     

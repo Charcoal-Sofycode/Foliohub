@@ -47,6 +47,17 @@ class TwoFactorVerify(BaseModel):
     email: EmailStr
     code: str
 
+class Enable2FARequest(BaseModel):
+    password: str
+    code: str
+
+class Disable2FARequest(BaseModel):
+    password: str
+
+class Edit2FARequest(BaseModel):
+    password: str
+    new_code: str
+
 class ForgotPassword(BaseModel):
     email: EmailStr
 
@@ -144,6 +155,10 @@ class PortfolioUpdate(BaseModel):
     bio: Optional[str] = None
     custom_domain: Optional[str] = None
     theme_preference: Optional[str] = None
+    logo_url: Optional[str] = None
+    accent_color: Optional[str] = None
+    typography: Optional[str] = None
+    intro_style: Optional[str] = None
     showreel_url: Optional[str] = None
     skills: Optional[str] = None
     location: Optional[str] = None
@@ -156,17 +171,30 @@ class PortfolioUpdate(BaseModel):
     skill_cutting: Optional[int] = None
     skill_motion: Optional[int] = None
     skill_color: Optional[int] = None
+    social_proof_headline: Optional[str] = None
+    brands_worked_with: Optional[str] = None
+    platform_rating: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    contact_email: Optional[str] = None
+    fiverr_url: Optional[str] = None
+    revision_policy: Optional[str] = None
+    agreement_url: Optional[str] = None
 
 # What we send back to the frontend
 class PortfolioResponse(BaseModel):
     id: int
     user_id: int
+    view_count: int = 0
     subdomain: str
     custom_domain: Optional[str] = None
     subscription_tier: str = "free"
     title: str
     bio: Optional[str]
     theme_preference: str
+    logo_url: Optional[str] = None
+    accent_color: Optional[str] = "#ffffff"
+    typography: Optional[str] = "sans"
+    intro_style: Optional[str] = "default"
     showreel_url: Optional[str] = None
     skills: Optional[str] = None
     location: Optional[str] = None
@@ -181,11 +209,21 @@ class PortfolioResponse(BaseModel):
     skill_color: Optional[int] = 50
     style_fingerprint: Optional[Any] = None
     fingerprint_computed_at: Optional[datetime] = None
+    social_proof_headline: Optional[str] = None
+    brands_worked_with: Optional[str] = None
+    platform_rating: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    contact_email: Optional[str] = None
+    fiverr_url: Optional[str] = None
+    revision_policy: Optional[str] = None
+    agreement_url: Optional[str] = None
     projects: list["ProjectResponse"] = []
 
 class ProjectUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    tags: Optional[str] = None
+    status: Optional[str] = None
     role: Optional[str] = None
     tools_used: Optional[str] = None
     category: Optional[str] = None
@@ -193,6 +231,37 @@ class ProjectUpdate(BaseModel):
     thumbnail_url: Optional[str] = None
     project_file_url: Optional[str] = None
     audio_proof: Optional[dict] = None
+    metric_views: Optional[str] = None
+    metric_likes: Optional[str] = None
+    metric_comments: Optional[str] = None
+    metric_retention: Optional[str] = None
+    metric_ctr: Optional[str] = None
+    metric_watch_time: Optional[str] = None
+    source_link: Optional[str] = None
+    client_goals: Optional[str] = None
+    strategy_notes: Optional[str] = None
+    monetization_results: Optional[str] = None
+
+class ProjectCommentCreate(BaseModel):
+    timestamp: Optional[int] = None
+    text: str
+    author_name: str
+
+class ProjectCommentUpdate(BaseModel):
+    text: Optional[str] = None
+    is_resolved: Optional[bool] = None
+
+class ProjectCommentResponse(BaseModel):
+    id: int
+    project_id: int
+    timestamp: float
+    text: str
+    author_name: Optional[str] = None
+    is_resolved: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 class ProjectResponse(BaseModel):
 
@@ -201,6 +270,8 @@ class ProjectResponse(BaseModel):
     title: str
     description: Optional[str]
     project_type: str
+    tags: Optional[str] = None
+    status: str = "published"
     role: Optional[str] = None
     tools_used: Optional[str] = None
     category: Optional[str] = None
@@ -212,8 +283,21 @@ class ProjectResponse(BaseModel):
     optimized_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
     transcoding_status: str = "pending"
+    metric_views: Optional[str] = None
+    metric_likes: Optional[str] = None
+    metric_comments: Optional[str] = None
+    metric_retention: Optional[str] = None
+    metric_ctr: Optional[str] = None
+    metric_watch_time: Optional[str] = None
+    source_link: Optional[str] = None
+    client_goals: Optional[str] = None
+    strategy_notes: Optional[str] = None
+    monetization_results: Optional[str] = None
     created_at: datetime
     story: Optional[ProjectStoryResponse] = None
+    comments: list["ProjectCommentResponse"] = []
+
+
 
 
     @field_validator("media_url", "raw_media_url", "optimized_url", "thumbnail_url", "project_file_url", mode="after")

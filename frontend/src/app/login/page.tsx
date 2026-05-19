@@ -118,12 +118,25 @@ export default function LoginPage() {
               {is2FAStep ? 'Two-Factor Authentication' : 'Access Portal'}
             </h2>
             <p className="text-zinc-500 text-sm">
-              {is2FAStep ? 'Enter the security code sent to your device.' : 'Enter your credentials to manage your reel.'}
+              {is2FAStep ? 'Enter your custom two-factor security PIN.' : 'Enter your credentials to manage your reel.'}
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {!is2FAStep ? (
+            {is2FAStep ? (
+              <div className="space-y-1">
+                <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Security PIN</label>
+                <input 
+                  type="password" 
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  required
+                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-2xl outline-none transition-colors placeholder-zinc-500 tracking-[0.3em] font-mono text-center"
+                  placeholder="••••••"
+                  maxLength={12}
+                />
+              </div>
+            ) : (
               <>
                 <div className="space-y-1">
                   <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Email Address</label>
@@ -161,19 +174,6 @@ export default function LoginPage() {
                   </div>
                 </div>
               </>
-            ) : (
-              <div className="space-y-1">
-                <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Security Code</label>
-                <input 
-                  type="text" 
-                  value={twoFactorCode}
-                  onChange={(e) => setTwoFactorCode(e.target.value)}
-                  required
-                  className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-2xl outline-none transition-colors placeholder-zinc-500 tracking-[0.5em] font-mono text-center"
-                  placeholder="000000"
-                  maxLength={6}
-                />
-              </div>
             )}
 
             {error && (
