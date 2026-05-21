@@ -156,6 +156,7 @@ class PortfolioUpdate(BaseModel):
     custom_domain: Optional[str] = None
     theme_preference: Optional[str] = None
     logo_url: Optional[str] = None
+    cover_image_url: Optional[str] = None
     accent_color: Optional[str] = None
     typography: Optional[str] = None
     intro_style: Optional[str] = None
@@ -192,6 +193,7 @@ class PortfolioResponse(BaseModel):
     bio: Optional[str]
     theme_preference: str
     logo_url: Optional[str] = None
+    cover_image_url: Optional[str] = None
     accent_color: Optional[str] = "#ffffff"
     typography: Optional[str] = "sans"
     intro_style: Optional[str] = "default"
@@ -218,6 +220,16 @@ class PortfolioResponse(BaseModel):
     revision_policy: Optional[str] = None
     agreement_url: Optional[str] = None
     projects: list["ProjectResponse"] = []
+
+    @field_validator("logo_url", "cover_image_url", "agreement_url", mode="after")
+    @classmethod
+    def presign_portfolio_urls(cls, v):
+        import s3_utils
+        if not v:
+            return v
+        if "s3.amazonaws.com" in v or (not v.startswith("http" ) and v):
+            return s3_utils.get_presigned_url(v)
+        return v
 
 class ProjectUpdate(BaseModel):
     title: Optional[str] = None

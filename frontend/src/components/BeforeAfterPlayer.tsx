@@ -59,6 +59,8 @@ export default forwardRef(function BeforeAfterPlayer({
   const isReady = rawReady && finalReady;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const isHoveredRef = useRef(false);
   
   // High-frequency refs to avoid React re-renders
   const sliderPosRef = useRef(50);
@@ -299,15 +301,56 @@ export default forwardRef(function BeforeAfterPlayer({
     }
   };
 
-  return (
+  const handlePreviewMouseEnter = () => {
+    setIsHovered(true);
+    isHoveredRef.current = true;
+    const final = finalVideoRef.current;
+    if (final) {
+      const playPromise = final.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+             if (!isHoveredRef.current && finalVideoRef.current) {
+               finalVideoRef.current.pause();
+             }
+          })
+          .catch((error) => {});
+      }
+    }
+  };
+
+  const handlePreviewMouseLeave = () => {
+    setIsHovered(false);
+    isHoveredRef.current = false;
+    const final = finalVideoRef.current;
+    if (final) {
+      if (final.readyState >= 3) {
+        final.pause();
+      }
+    }
+  };
+
+  // Handle ESC key to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  const playerContent = (
     <div 
       ref={containerRef}
-      className={`relative w-full bg-black overflow-hidden select-none group touch-none transition-all duration-500 ${className} ${isFullscreen ? 'fixed inset-0 z-[2147483647]' : (expanded ? 'rounded-none' : 'rounded-xl border border-white/5')}`}
+      className={`relative w-full bg-black overflow-hidden select-none group touch-none transition-all duration-500 ${className} ${isFullscreen ? 'w-full h-full rounded-2xl border border-white/5 shadow-2xl' : (expanded ? 'rounded-none' : 'rounded-xl border border-white/5')}`}
       style={{ 
         '--slider-pos': '50%',
         '--slider-pos-val': '50',
-        aspectRatio: isFullscreen ? 'auto' : (aspectRatio ? aspectRatio : '9/16'),
-        height: isFullscreen ? '100vh' : 'auto',
+        aspectRatio: aspectRatio ? aspectRatio : '9/16',
+        height: isFullscreen ? '100%' : 'auto',
         maxHeight: isFullscreen ? 'none' : '82vh',
         maxWidth: isFullscreen ? 'none' : ((!aspectRatio || aspectRatio < 1) ? 'calc(82vh * 9 / 16)' : 'none')
       } as any}
@@ -320,7 +363,16 @@ export default forwardRef(function BeforeAfterPlayer({
         onPointerUp={onPointerUp}
       />
       <div className="absolute inset-0 z-0">
-        <video ref={rawVideoRef} src={rawUrl} loop muted={isMuted} playsInline onLoadedMetadata={(e) => handleMetadata(e, 'raw')} className="w-full h-full object-cover transform-gpu" />
+        <video 
+          ref={rawVideoRef} 
+          src={rawUrl} 
+          loop 
+          muted={isMuted} 
+          playsInline 
+          autoPlay={isFullscreen}
+          onLoadedMetadata={(e) => handleMetadata(e, 'raw')} 
+          className="w-full h-full object-cover transform-gpu" 
+        />
       </div>
 
       <div className="absolute inset-0 z-10" style={{ clipPath: 'inset(0 0 0 var(--slider-pos))' }}>
@@ -330,6 +382,7 @@ export default forwardRef(function BeforeAfterPlayer({
           loop 
           muted={isMuted} 
           playsInline 
+          autoPlay={isFullscreen}
           onLoadedMetadata={(e) => handleMetadata(e, 'final')} 
           className="w-full h-full object-cover transform-gpu" 
           style={{ willChange: 'transform, clip-path' }} 
@@ -346,8 +399,6 @@ export default forwardRef(function BeforeAfterPlayer({
         </div>
       </div>
 
-      {/* Center play button removed for cleaner look */}
-      
       {/* --- QUALITY BADGE --- */}
       <div className={qualityBadgeClassName || "absolute top-6 left-6 z-50 pointer-events-none"}>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full">
@@ -364,7 +415,7 @@ export default forwardRef(function BeforeAfterPlayer({
         style={{ opacity: 'clamp(0, calc((var(--slider-pos-val) - 15) / 15), 1)' } as any}
       >
         <div className="px-2 py-1 bg-black/40 backdrop-blur-md border border-white/5 rounded-sm">
-           <span className="text-[8px] font-mono font-black text-white/40 uppercase tracking-[0.2em]">Raw Footage</span>
+           <span className="text-[8px] font-mono font-black text-white/40 uppercase tracking-[0.2em]">{beforeLabel}</span>
         </div>
       </div>
       <div 
@@ -372,7 +423,7 @@ export default forwardRef(function BeforeAfterPlayer({
         style={{ opacity: 'clamp(0, calc((85 - var(--slider-pos-val)) / 15), 1)' } as any}
       >
         <div className="px-2 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded-sm shadow-[0_0_20px_rgba(255,255,255,0.05)]">
-           <span className="text-[8px] font-mono font-black text-white/90 uppercase tracking-[0.2em]">Post Processed</span>
+           <span className="text-[8px] font-mono font-black text-white/90 uppercase tracking-[0.2em]">{afterLabel}</span>
         </div>
       </div>
 
@@ -406,12 +457,130 @@ export default forwardRef(function BeforeAfterPlayer({
            </div>
         </div>
       )}
-
-      {isFullscreen && (
-        <button onClick={toggleFullscreen} className="absolute top-6 right-6 z-[100] w-12 h-12 bg-white text-black rounded-full flex items-center justify-center shadow-2xl">
-          <X className="w-6 h-6" />
-        </button>
-      )}
     </div>
   );
+
+  // If we are in card preview mode (not expanded and not fullscreen)
+  if (!expanded && !isFullscreen) {
+    return (
+      <div 
+        className={`relative w-full bg-[#050505] group cursor-pointer overflow-hidden border-zinc-900 rounded-xl border border-white/5 ${className}`}
+        style={{ 
+          aspectRatio: aspectRatio ? aspectRatio : '9/16',
+          maxHeight: '82vh',
+          maxWidth: (!aspectRatio || aspectRatio < 1) ? 'calc(82vh * 9 / 16)' : 'none'
+        } as any}
+        onMouseEnter={handlePreviewMouseEnter}
+        onMouseLeave={handlePreviewMouseLeave}
+        onClick={(e) => {
+          if (onVideoClick) {
+            onVideoClick(e);
+          } else {
+            setIsFullscreen(true);
+            setIsPlaying(true);
+          }
+        }}
+        onContextMenu={onContextMenu}
+      >
+        <video
+          ref={finalVideoRef}
+          src={finalUrl}
+          poster={thumbnailUrl}
+          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+          muted={isMuted}
+          loop
+          playsInline
+          onLoadedMetadata={(e) => handleMetadata(e, 'final')}
+        />
+
+        <div className={qualityBadgeClassName || "absolute top-6 left-6 z-50 pointer-events-none"}>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full">
+            <div className={`w-1.5 h-1.5 rounded-full ${subscriptionTier === 'premium' ? 'bg-[#818cf8] animate-pulse shadow-[0_0_8px_#818cf8]' : 'bg-zinc-500'}`} />
+            <span className="text-[9px] font-mono font-black uppercase tracking-[0.2em] text-white/90">
+              {subscriptionTier === 'premium' ? '4K / LOSSLESS' : 'HD / STANDARD'}
+            </span>
+          </div>
+        </div>
+
+        {/* Hover Overlay */}
+        <div className={`absolute inset-0 bg-black/40 flex flex-col justify-between p-4 transition-all duration-500 ease-in-out ${isHovered ? 'opacity-100 backdrop-blur-sm' : 'opacity-0 backdrop-blur-none'}`}>
+          <div />
+
+          <div className="flex justify-center items-center">
+             <motion.div 
+               initial={{ scale: 0.8, opacity: 0 }}
+               animate={{ scale: isHovered ? 1 : 0.8, opacity: isHovered ? 1 : 0 }}
+               className="w-16 h-16 rounded-full border border-white/20 bg-black/40 backdrop-blur-md flex items-center justify-center text-white"
+             >
+                <Play className="w-6 h-6 fill-current ml-1" />
+             </motion.div>
+          </div>
+
+          <div className="flex justify-between items-end">
+             <div className="bg-black/80 backdrop-blur-2xl px-4 py-2 rounded-lg border border-white/5 text-[9px] uppercase tracking-[0.2em] text-white font-bold flex items-center gap-3">
+                <span className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" /> Slider Comparison
+             </div>
+             <div className="flex items-center gap-2 text-white/50 group-hover:text-white transition-colors duration-500">
+                <span className="text-[10px] font-mono uppercase tracking-widest">Compare</span>
+                <Maximize2 className="w-4 h-4" />
+             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If in fullscreen mode
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-[2147483647] bg-black/98 backdrop-blur-[100px] flex items-center justify-center p-4 md:p-8 lg:p-12 overflow-hidden">
+        {/* Security Layer Overlay */}
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black to-transparent z-10 pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none" />
+
+        {/* Close Button */}
+        <button 
+          onClick={() => {
+            setIsFullscreen(false);
+          }}
+          className="absolute top-6 right-6 lg:top-10 lg:right-10 w-12 h-12 bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all z-20"
+        >
+          <X className="w-6 h-6" />
+        </button>
+        
+        {/* Info overlay (just like PortfolioPlayer) */}
+        <div className="absolute top-6 left-6 lg:top-10 lg:left-10 text-white z-20 flex flex-col md:flex-row md:items-center gap-6 md:gap-12">
+           <div className="max-w-xl">
+              <div className="flex items-center gap-2 mb-1">
+                 <span className="w-2 h-2 bg-indigo-400 animate-pulse" />
+                 <p className="text-[9px] uppercase font-mono tracking-[0.4em] text-zinc-500">
+                   Before & After slider comparison
+                 </p>
+              </div>
+              <h3 className="text-3xl font-black tracking-tighter uppercase leading-none">{title || "Untitled Masterpiece"}</h3>
+           </div>
+        </div>
+
+        {/* Sliding Player centered with original aspect ratio */}
+        <div 
+          className="w-full relative z-10 flex items-center justify-center"
+          style={{ 
+            aspectRatio: aspectRatio ? aspectRatio : '16/9', 
+            maxHeight: '85vh',
+            maxWidth: aspectRatio ? `min(calc(85vh * ${aspectRatio}), 1152px)` : '1152px'
+          }}
+        >
+          {playerContent}
+        </div>
+
+        {/* Interaction Hint */}
+        <div className="absolute bottom-8 text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em] z-20">
+           Studio Viewport Focus Mode
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded inline player (default fallback, e.g. review room)
+  return playerContent;
 });

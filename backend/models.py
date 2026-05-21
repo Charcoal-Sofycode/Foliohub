@@ -12,6 +12,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     subscription_tier = Column(String, default="free") # "free" or "premium"
     stripe_customer_id = Column(String, unique=True, nullable=True)
+    paypal_subscription_id = Column(String, unique=True, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Security
@@ -36,6 +37,7 @@ class Portfolio(Base):
     
     # Custom Branding
     logo_url = Column(String, nullable=True)
+    cover_image_url = Column(String, nullable=True)
     accent_color = Column(String, default="#ffffff")
     typography = Column(String, default="sans")
     intro_style = Column(String, default="default")

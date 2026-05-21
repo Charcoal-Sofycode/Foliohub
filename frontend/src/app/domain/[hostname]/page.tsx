@@ -70,10 +70,10 @@ export default function CustomDomainPortfolio({ params }: { params: Promise<{ ho
   const categories = ['All', ...Array.from(new Set(projects.map((p: any) => p.category || 'general'))).filter(c => c !== 'general')];
   const filteredProjects = activeCategory === 'All' ? projects : projects.filter((p: any) => p.category === activeCategory);
   const skillsList = portfolio.skills ? portfolio.skills.split(',').map((s: string) => s.trim()) : [];
-  const fontClass = portfolio?.typography === 'serif' ? 'font-serif' : portfolio?.typography === 'mono' ? 'font-mono' : 'font-sans';
-  const accentColor = portfolio?.accent_color || '#ffffff';
-  const introInitial = portfolio?.intro_style === 'none' ? { opacity: 1, y: 0 } : portfolio?.intro_style === 'cinematic' ? { opacity: 0, y: 50, scale: 0.95 } : portfolio?.intro_style === 'glitch' ? { opacity: 0, x: -50 } : { opacity: 0, y: 20 };
-  const introAnimate = portfolio?.intro_style === 'none' ? { opacity: 1, y: 0 } : portfolio?.intro_style === 'cinematic' ? { opacity: 1, y: 0, scale: 1 } : portfolio?.intro_style === 'glitch' ? { opacity: 1, x: 0 } : { opacity: 1, y: 0 };
+  const fontClass = 'font-sans';
+  const accentColor = '#ffffff';
+  const introInitial = { opacity: 0, y: 20 };
+  const introAnimate = { opacity: 1, y: 0 };
 
   return (
     <main className={`min-h-screen bg-[#050505] text-white ${fontClass} selection:bg-white selection:text-black pb-32`}>

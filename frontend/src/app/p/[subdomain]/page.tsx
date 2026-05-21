@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { motion } from 'framer-motion';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
-import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download, MessageCircle, Mail, Briefcase, Activity } from 'lucide-react';
+import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download, MessageCircle, Mail, Briefcase, Activity, Search } from 'lucide-react';
 import FolioLogo from '@/components/FolioLogo';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
 import StyleFingerprint from '@/components/StyleFingerprint';
@@ -15,6 +15,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
   const [portfolio, setPortfolio] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [projectSearch, setProjectSearch] = useState('');
 
   useEffect(() => {
     fetch(`${API_URL}/portfolios/view/${resolvedParams.subdomain}`)
@@ -46,27 +47,32 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
     );
   }
 
-  const projects = portfolio.projects || [];
+  const projects = (portfolio.projects || []).filter((p: any) => !p.status || p.status === 'published' || p.status === 'approved');
   const categories = ['All', ...Array.from(new Set(projects.map((p: any) => p.category || 'general'))).filter(c => c !== 'general')];
   
-  const filteredProjects = activeCategory === 'All' 
-    ? projects 
-    : projects.filter((p: any) => p.category === activeCategory);
+  const filteredProjects = projects.filter((p: any) => {
+    const matchesCategory = activeCategory === 'All' || p.category === activeCategory;
+    if (!matchesCategory) return false;
+
+    const query = projectSearch.toLowerCase().trim();
+    if (!query) return true;
+
+    const title = (p.title || '').toLowerCase();
+    const desc = (p.description || '').toLowerCase();
+    const tags = (p.tags || '').toLowerCase();
+    const category = (p.category || '').toLowerCase();
+
+    return title.includes(query) || desc.includes(query) || tags.includes(query) || category.includes(query);
+  });
 
   const skillsList = portfolio.skills ? portfolio.skills.split(',').map((s: string) => s.trim()) : [];
 
-  const fontClass = portfolio?.typography === 'serif' ? 'font-serif' : portfolio?.typography === 'mono' ? 'font-mono' : 'font-sans';
-  const accentColor = portfolio?.accent_color || '#ffffff';
+  const fontClass = 'font-sans';
+  const accentColor = '#ffffff';
+  const introInitial = { opacity: 0, y: 20 };
+  const introAnimate = { opacity: 1, y: 0 };
 
-  const introInitial = portfolio?.intro_style === 'none' ? { opacity: 1, y: 0 } :
-                       portfolio?.intro_style === 'cinematic' ? { opacity: 0, y: 50, scale: 0.95 } :
-                       portfolio?.intro_style === 'glitch' ? { opacity: 0, x: -50 } :
-                       { opacity: 0, y: 20 };
-
-  const introAnimate = portfolio?.intro_style === 'none' ? { opacity: 1, y: 0 } :
-                       portfolio?.intro_style === 'cinematic' ? { opacity: 1, y: 0, scale: 1 } :
-                       portfolio?.intro_style === 'glitch' ? { opacity: 1, x: 0 } :
-                       { opacity: 1, y: 0 };
+  const hasHeaderBackground = !!(portfolio.showreel_url || portfolio.cover_image_url);
 
   return (
     <main className={`min-h-screen bg-[#050505] text-white ${fontClass} selection:bg-white selection:text-black pb-32`}>
@@ -95,7 +101,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
       </nav>
 
       {/* Hero / Showreel */}
-      <header className="h-[90vh] relative pt-24 sm:pt-32 px-4 sm:px-6 lg:px-12 flex flex-col justify-end pb-8 sm:pb-12">
+      <header className={`${hasHeaderBackground ? 'h-[90vh]' : 'min-h-[50vh] sm:min-h-[60vh]'} relative pt-24 sm:pt-32 px-4 sm:px-6 lg:px-12 flex flex-col justify-end pb-8 sm:pb-12`}>
          {portfolio.showreel_url ? (
             <div className="absolute inset-0 z-0">
                {/* Embed youtube or video. If it's a raw video url: */}
@@ -114,6 +120,15 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                   </div>
                )}
                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+            </div>
+         ) : portfolio.cover_image_url ? (
+            <div className="absolute inset-0 z-0">
+               <img 
+                  src={portfolio.cover_image_url} 
+                  alt={`${portfolio.title} Cover`}
+                  className="w-full h-full object-cover opacity-50" 
+               />
+               <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />
             </div>
          ) : null}
 
@@ -252,23 +267,37 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
 
       {/* Projects Gallery */}
       <section className="px-4 sm:px-6 lg:px-12 py-16 sm:py-24">
-         <div className="flex flex-col md:flex-row justify-between items-end mb-12 sm:mb-16 gap-6 sm:gap-8">
-            <h3 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter">Selected <br/><span className="text-zinc-500 italic font-serif font-light">Works.</span></h3>
+         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-12 sm:mb-16 gap-6 sm:gap-8">
+            <div>
+               <h3 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter">Selected <br/><span className="text-zinc-500 italic font-serif font-light">Works.</span></h3>
+            </div>
             
-            <div className="flex gap-3 overflow-x-auto pb-2 sm:pb-4">
-               {categories.map((cat: any) => (
-                  <button 
-                    key={cat}
-                    onClick={() => setActiveCategory(cat)}
-                    className={`px-4 sm:px-6 py-2 text-xs font-mono uppercase tracking-widest whitespace-nowrap transition-colors ${activeCategory === cat ? 'bg-white text-black' : 'border border-zinc-800 text-zinc-500 hover:text-white'}`}
-                  >
-                    {cat}
-                  </button>
-               ))}
+            <div className="w-full lg:max-w-2xl flex flex-col sm:flex-row items-center gap-4 bg-zinc-950/40 p-3 rounded-xl border border-zinc-900 backdrop-blur-md">
+               <div className="relative flex-1 w-full">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <input 
+                     type="text" 
+                     placeholder="Search projects..." 
+                     className="w-full bg-black/40 border border-zinc-800 rounded-lg pl-11 pr-4 py-2.5 text-xs text-white outline-none focus:border-zinc-500 transition font-mono uppercase tracking-wider"
+                     value={projectSearch}
+                     onChange={(e) => setProjectSearch(e.target.value)}
+                  />
+               </div>
+               <div className="flex gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
+                  {categories.map((cat: any) => (
+                     <button 
+                       key={cat}
+                       onClick={() => setActiveCategory(cat)}
+                       className={`px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest whitespace-nowrap transition-all rounded-md ${activeCategory === cat ? 'bg-white text-black font-bold shadow-lg shadow-white/5' : 'border border-zinc-900 bg-zinc-900/50 text-zinc-500 hover:text-white hover:border-zinc-800'}`}
+                     >
+                       {cat}
+                     </button>
+                  ))}
+               </div>
             </div>
          </div>
 
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20 items-start">
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 items-start">
             {filteredProjects.map((project: any, i: number) => (
                <motion.div 
                  initial={{ opacity: 0, y: 50 }}

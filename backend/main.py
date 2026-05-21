@@ -35,14 +35,31 @@ limiter = Limiter(key_func=get_remote_address)
 import models, schemas, auth
 from database import get_db, engine
 import os
-import stripe
+import requests
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "")
+PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "")
+PAYPAL_MODE = os.getenv("PAYPAL_MODE", "sandbox")
+PAYPAL_PLAN_ID = os.getenv("PAYPAL_PLAN_ID", "")
+
+PAYPAL_API_BASE = (
+    "https://api-m.sandbox.paypal.com"
+    if PAYPAL_MODE == "sandbox"
+    else "https://api-m.paypal.com"
+)
 
 # ── Dynamic Schema Sync ───────────────────────────────────────────────────────
 # This ensures that any new models (like SignupOTP) are created automatically
 models.Base.metadata.create_all(bind=engine)
+
+from sqlalchemy import text
+try:
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS paypal_subscription_id VARCHAR;"))
+        conn.commit()
+    logger.info("Successfully synced database schema for paypal_subscription_id.")
+except Exception as schema_err:
+    logger.warning(f"Database schema sync warning (might already exist): {schema_err}")
 
 app = FastAPI(title="Portfolio SaaS API")
 
@@ -1059,90 +1076,181 @@ def ai_match_editors(request: schemas.MatchRequest, db: Session = Depends(get_db
     results.sort(key=lambda x: x.match_score, reverse=True)
     return results[:5]
 
+def get_paypal_access_token() -> str:
+    """Helper to fetch a PayPal OAuth2 access token."""
+    if not PAYPAL_CLIENT_ID or not PAYPAL_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="PayPal credentials are not configured on the server."
+        )
+    url = f"{PAYPAL_API_BASE}/v1/oauth2/token"
+    headers = {
+        "Accept": "application/json",
+        "Accept-Language": "en_US",
+    }
+    data = {
+        "grant_type": "client_credentials"
+    }
+    response = requests.post(
+        url,
+        headers=headers,
+        data=data,
+        auth=(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
+        timeout=10
+    )
+    if response.status_code != 200:
+        logger.error(f"PayPal Token Error: {response.text}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to authenticate with PayPal."
+        )
+    return response.json().get("access_token")
+
 @app.post("/create-checkout-session")
 def create_checkout_session(current_user: models.User = Depends(get_current_user)):
     try:
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        # price_1TVZpt2ZEcm35CvCu6AWgifY is the $5/month Foliohub Premium price
-        session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[{
-                'price': 'price_1TVZpt2ZEcm35CvCu6AWgifY',
-                'quantity': 1,
-            }],
-            mode='subscription',
-            success_url=f'{frontend_url}/dashboard?session_id={{CHECKOUT_SESSION_ID}}',
-            cancel_url=f'{frontend_url}/dashboard',
-            client_reference_id=str(current_user.id),
-            customer_email=current_user.email if not current_user.stripe_customer_id else None,
-            customer=current_user.stripe_customer_id
-        )
-        return {"url": session.url}
+        token = get_paypal_access_token()
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+
+        # If a PayPal Plan ID is configured, create a Subscription
+        if PAYPAL_PLAN_ID:
+            url = f"{PAYPAL_API_BASE}/v1/billing/subscriptions"
+            payload = {
+                "plan_id": PAYPAL_PLAN_ID,
+                "application_context": {
+                    "brand_name": "Foliohub",
+                    "user_action": "SUBSCRIBE_NOW",
+                    "return_url": f"{frontend_url}/dashboard?paypal_status=success",
+                    "cancel_url": f"{frontend_url}/dashboard?paypal_status=cancel",
+                }
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code not in (200, 201):
+                logger.error(f"PayPal Subscription Error: {response.text}")
+                raise HTTPException(status_code=500, detail="Failed to create PayPal subscription.")
+            
+            res_data = response.json()
+            approval_url = next(link["href"] for link in res_data["links"] if link["rel"] == "approve")
+            return {"url": approval_url, "id": res_data["id"]}
+        
+        # Fallback: Create a $5.00 one-time Order
+        else:
+            url = f"{PAYPAL_API_BASE}/v2/checkout/orders"
+            payload = {
+                "intent": "CAPTURE",
+                "purchase_units": [{
+                    "amount": {
+                        "currency_code": "USD",
+                        "value": "5.00"
+                    },
+                    "description": "Foliohub Premium Upgrade"
+                }],
+                "application_context": {
+                    "brand_name": "Foliohub",
+                    "user_action": "PAY_NOW",
+                    "return_url": f"{frontend_url}/dashboard?paypal_status=success",
+                    "cancel_url": f"{frontend_url}/dashboard?paypal_status=cancel",
+                }
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code not in (200, 201):
+                logger.error(f"PayPal Order Error: {response.text}")
+                raise HTTPException(status_code=500, detail="Failed to create PayPal order.")
+            
+            res_data = response.json()
+            approval_url = next(link["href"] for link in res_data["links"] if link["rel"] == "approve")
+            return {"url": approval_url, "id": res_data["id"]}
+
     except Exception as e:
-        logger.error(f"Stripe Session Error: {e}")
+        logger.error(f"PayPal Session Error: {e}")
         raise HTTPException(status_code=500, detail="Failed to initiate premium checkout.")
 
 @app.get("/verify-session/{session_id}")
 def verify_session(session_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     try:
-        session = stripe.checkout.Session.retrieve(session_id)
-        if session.payment_status == 'paid' and session.client_reference_id == str(current_user.id):
-            # Force update in case webhook hasn't fired yet
-            current_user.subscription_tier = "premium"
-            current_user.stripe_customer_id = session.customer
-            db.commit()
-            return {"status": "premium"}
+        token = get_paypal_access_token()
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+
+        # Check if the session_id is a subscription ID (usually starts with I-)
+        is_subscription = session_id.startswith("I-")
+
+        if is_subscription:
+            url = f"{PAYPAL_API_BASE}/v1/billing/subscriptions/{session_id}"
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                res_data = response.json()
+                if res_data.get("status") in ("ACTIVE", "APPROVED"):
+                    current_user.subscription_tier = "premium"
+                    current_user.paypal_subscription_id = session_id
+                    db.commit()
+                    return {"status": "premium"}
+        else:
+            # It's an Order ID, let's capture it if it isn't already captured
+            url = f"{PAYPAL_API_BASE}/v2/checkout/orders/{session_id}"
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                order_data = response.json()
+                status = order_data.get("status")
+                
+                # If approved, capture it
+                if status == "APPROVED":
+                    capture_url = f"{PAYPAL_API_BASE}/v2/checkout/orders/{session_id}/capture"
+                    cap_response = requests.post(capture_url, headers=headers, timeout=10)
+                    if cap_response.status_code in (200, 201):
+                        order_data = cap_response.json()
+                        status = order_data.get("status")
+                
+                if status == "COMPLETED":
+                    current_user.subscription_tier = "premium"
+                    current_user.paypal_subscription_id = session_id
+                    db.commit()
+                    return {"status": "premium"}
+
         return {"status": current_user.subscription_tier or "free"}
     except Exception as e:
-        print(f"Session Verification Error: {e}")
+        logger.error(f"PayPal Session Verification Error: {e}")
         return {"status": current_user.subscription_tier or "free"}
 
 from fastapi import Request
 
-@app.post("/webhook/stripe")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-
-    # Verify webhook signature if secret is configured (strongly recommended in production)
-    if STRIPE_WEBHOOK_SECRET:
-        try:
-            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-        except stripe.error.SignatureVerificationError:
-            raise HTTPException(status_code=400, detail="Invalid Stripe webhook signature.")
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    else:
-        # Fallback for local dev without a webhook secret (unsafe for production)
-        try:
-            import json
-            event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        user_id = session.get('client_reference_id')
+@app.post("/webhook/paypal")
+async def paypal_webhook(request: Request, db: Session = Depends(get_db)):
+    try:
+        payload = await request.json()
+        event_type = payload.get("event_type")
+        resource = payload.get("resource", {})
         
-        if user_id:
-            user = db.query(models.User).filter(models.User.id == int(user_id)).first()
-            if user:
-                user.subscription_tier = "premium"
-                user.stripe_customer_id = session.get('customer')
-                db.commit()
-                logger.info(f"✅ User {user.email} upgraded to Premium via Checkout.")
+        logger.info(f"Received PayPal Webhook: {event_type}")
 
-    elif event['type'] == 'customer.subscription.deleted':
-        subscription = event['data']['object']
-        customer_id = subscription.get('customer')
-        if customer_id:
-            user = db.query(models.User).filter(models.User.stripe_customer_id == customer_id).first()
-            if user:
-                user.subscription_tier = "free"
-                db.commit()
-                logger.info(f"🛑 User {user.email} downgraded to Free (Subscription Deleted).")
+        if event_type == "BILLING.SUBSCRIPTION.CANCELLED":
+            subscription_id = resource.get("id")
+            if subscription_id:
+                user = db.query(models.User).filter(models.User.paypal_subscription_id == subscription_id).first()
+                if user:
+                    user.subscription_tier = "free"
+                    db.commit()
+                    logger.info(f"🛑 User {user.email} downgraded to Free (Subscription Cancelled).")
 
-    return {"status": "success"}
+        elif event_type == "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
+            subscription_id = resource.get("id")
+            if subscription_id:
+                user = db.query(models.User).filter(models.User.paypal_subscription_id == subscription_id).first()
+                if user:
+                    user.subscription_tier = "free"
+                    db.commit()
+                    logger.info(f"🛑 User {user.email} downgraded to Free (Payment Failed).")
+
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"PayPal Webhook Error: {e}")
+        return {"status": "ignored"}
 @app.post("/downgrade")
 def downgrade_plan(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # Note: In a live subscription environment, this would call stripe.Subscription.modify

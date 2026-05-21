@@ -136,6 +136,13 @@ function DashboardContent() {
   // Settings State
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [agreementFile, setAgreementFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverRemoved, setCoverRemoved] = useState(false);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
 
   // 2FA State
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -746,9 +753,47 @@ function DashboardContent() {
         }
       }
 
+      // Handle Logo File Upload / Removal
+      if (logoRemoved) {
+        data.logo_url = "";
+      } else if (logoFile) {
+        const res = await startMultipartUpload(logoFile, () => {});
+        if (res.url) {
+          data.logo_url = res.url;
+        }
+      } else {
+        data.logo_url = portfolio?.logo_url || "";
+      }
+
+      // Handle Cover File Upload / Removal
+      if (coverRemoved) {
+        data.cover_image_url = "";
+      } else if (coverFile) {
+        const res = await startMultipartUpload(coverFile, () => {});
+        if (res.url) {
+          data.cover_image_url = res.url;
+        }
+      } else {
+        data.cover_image_url = portfolio?.cover_image_url || "";
+      }
+
       const res = await api.put('/portfolios/me', data);
       setPortfolio(res.data);
       setAgreementFile(null);
+      setLogoFile(null);
+      if (logoPreviewUrl) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+      setLogoPreviewUrl(null);
+      setLogoRemoved(false);
+
+      setCoverFile(null);
+      if (coverPreviewUrl) {
+        URL.revokeObjectURL(coverPreviewUrl);
+      }
+      setCoverPreviewUrl(null);
+      setCoverRemoved(false);
+
       alert('Portfolio Updated!');
     } catch(err) {
       console.error(err);
@@ -1535,36 +1580,157 @@ function DashboardContent() {
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand" /> Custom Branding</label>
                         <p className="text-xs text-zinc-600 mb-6 font-light">Look like a brand, not just a random freelancer.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                           <div>
-                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Logo URL (Optional)</label>
-                              <input name="logo_url" type="text" placeholder="https://..." defaultValue={portfolio.logo_url || ''} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors" />
-                           </div>
-                           <div>
-                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Accent Color (Hex)</label>
-                              <div className="flex gap-4">
-                                <input name="accent_color" type="color" defaultValue={portfolio.accent_color || '#ffffff'} className="w-12 h-12 rounded bg-transparent border-none cursor-pointer" />
-                                <input type="text" placeholder="#ffffff" value={portfolio.accent_color || '#ffffff'} disabled className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 font-light outline-none" />
-                              </div>
-                           </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                           <div>
-                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Typography Style</label>
-                              <select name="typography" defaultValue={portfolio.typography || 'sans'} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors">
-                                 <option value="sans" className="bg-black text-white">Sans-serif (Modern)</option>
-                                 <option value="serif" className="bg-black text-white">Serif (Elegant)</option>
-                                 <option value="mono" className="bg-black text-white">Monospace (Tech)</option>
-                              </select>
-                           </div>
-                           <div>
-                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Intro Animation</label>
-                              <select name="intro_style" defaultValue={portfolio.intro_style || 'default'} className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-3 text-lg text-white font-light outline-none transition-colors">
-                                 <option value="default" className="bg-black text-white">Default Fade</option>
-                                 <option value="cinematic" className="bg-black text-white">Cinematic Slide</option>
-                                 <option value="glitch" className="bg-black text-white">Glitch Effect</option>
-                                 <option value="none" className="bg-black text-white">None (Instant Load)</option>
-                              </select>
-                           </div>
+                            {/* Studio Logo Column */}
+                            <div className="space-y-4">
+                               <div className="flex items-center justify-between">
+                                 <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Studio Logo (Optional)</label>
+                               </div>
+
+                               <div className="space-y-3">
+                                 {portfolio?.logo_url && !logoRemoved && !logoFile ? (
+                                   <div className="flex items-center gap-4 bg-[#0a0a0a]/50 border border-zinc-800 p-4 rounded-xl relative group overflow-hidden">
+                                      <div className="w-14 h-14 bg-zinc-950 rounded-lg flex items-center justify-center border border-zinc-900 overflow-hidden relative p-2">
+                                        <img src={portfolio.logo_url} alt="Current logo" className="max-w-full max-h-full object-contain" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">Current Studio Logo</p>
+                                        <p className="text-[10px] text-zinc-600 font-mono tracking-widest mt-1 truncate">Stored Securely in S3</p>
+                                      </div>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setLogoRemoved(true)}
+                                        className="text-[9px] font-mono font-bold uppercase tracking-widest text-red-500 hover:bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded bg-transparent transition"
+                                      >
+                                        Remove Logo
+                                      </button>
+                                   </div>
+                                 ) : logoFile ? (
+                                   <div className="flex items-center gap-4 bg-[#0a0a0a]/50 border border-zinc-800 p-4 rounded-xl relative overflow-hidden">
+                                      <div className="w-14 h-14 bg-zinc-950 rounded-lg flex items-center justify-center border border-zinc-900 overflow-hidden relative p-2">
+                                        {logoPreviewUrl ? (
+                                          <img src={logoPreviewUrl} alt="New logo preview" className="max-w-full max-h-full object-contain" />
+                                        ) : (
+                                          <UploadCloud className="w-5 h-5 text-zinc-500 animate-pulse" />
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">New Logo Staged</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono tracking-widest mt-1 truncate">
+                                          {logoFile.name} ({(logoFile.size / 1024).toFixed(1)} KB)
+                                        </p>
+                                      </div>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => {
+                                          setLogoFile(null);
+                                          if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+                                          setLogoPreviewUrl(null);
+                                        }}
+                                        className="text-[9px] font-mono font-bold uppercase tracking-widest text-zinc-500 hover:text-white border border-zinc-800 hover:border-zinc-750 px-3 py-1.5 rounded bg-zinc-950 transition"
+                                      >
+                                        Cancel
+                                      </button>
+                                   </div>
+                                 ) : (
+                                   <label className="flex flex-col items-center justify-center bg-[#070707]/30 hover:bg-zinc-950/60 border border-dashed border-zinc-800 hover:border-zinc-750 p-6 rounded-xl text-center cursor-pointer transition group">
+                                      <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setLogoFile(file);
+                                            setLogoRemoved(false);
+                                            setLogoPreviewUrl(URL.createObjectURL(file));
+                                          }
+                                        }} 
+                                      />
+                                      <div className="w-10 h-10 bg-zinc-950 rounded-full flex items-center justify-center mb-3 border border-zinc-900 group-hover:border-zinc-800 transition">
+                                        <UploadCloud className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition" />
+                                      </div>
+                                      <p className="text-xs font-bold text-zinc-400 tracking-tight">Stage Logo Photo</p>
+                                      <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mt-1.5 leading-relaxed">PNG, JPG, or SVG up to 5MB</p>
+                                   </label>
+                                 )}
+                               </div>
+                            </div>
+
+                            {/* Cover Image Column */}
+                            <div className="space-y-4">
+                               <div className="flex items-center justify-between">
+                                 <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Cover Image (Optional)</label>
+                               </div>
+
+                               <div className="space-y-3">
+                                 {portfolio?.cover_image_url && !coverRemoved && !coverFile ? (
+                                   <div className="flex items-center gap-4 bg-[#0a0a0a]/50 border border-zinc-800 p-4 rounded-xl relative group overflow-hidden">
+                                      <div className="w-14 h-14 bg-zinc-950 rounded-lg flex items-center justify-center border border-zinc-900 overflow-hidden relative p-2">
+                                        <img src={portfolio.cover_image_url} alt="Current cover" className="max-w-full max-h-full object-contain" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-mono font-bold text-zinc-400 uppercase tracking-wider">Current Cover Image</p>
+                                        <p className="text-[10px] text-zinc-600 font-mono tracking-widest mt-1 truncate">Stored Securely in S3</p>
+                                      </div>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setCoverRemoved(true)}
+                                        className="text-[9px] font-mono font-bold uppercase tracking-widest text-red-500 hover:bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded bg-transparent transition"
+                                      >
+                                        Remove Cover
+                                      </button>
+                                   </div>
+                                 ) : coverFile ? (
+                                   <div className="flex items-center gap-4 bg-[#0a0a0a]/50 border border-zinc-800 p-4 rounded-xl relative overflow-hidden">
+                                      <div className="w-14 h-14 bg-zinc-950 rounded-lg flex items-center justify-center border border-zinc-900 overflow-hidden relative p-2">
+                                        {coverPreviewUrl ? (
+                                          <img src={coverPreviewUrl} alt="New cover preview" className="max-w-full max-h-full object-contain" />
+                                        ) : (
+                                          <UploadCloud className="w-5 h-5 text-zinc-500 animate-pulse" />
+                                        )}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">New Cover Staged</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono tracking-widest mt-1 truncate">
+                                          {coverFile.name} ({(coverFile.size / 1024).toFixed(1)} KB)
+                                        </p>
+                                      </div>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => {
+                                          setCoverFile(null);
+                                          if (coverPreviewUrl) URL.revokeObjectURL(coverPreviewUrl);
+                                          setCoverPreviewUrl(null);
+                                        }}
+                                        className="text-[9px] font-mono font-bold uppercase tracking-widest text-zinc-500 hover:text-white border border-zinc-800 hover:border-zinc-700 px-3 py-1.5 rounded bg-zinc-950 transition"
+                                      >
+                                        Cancel
+                                      </button>
+                                   </div>
+                                 ) : (
+                                   <label className="flex flex-col items-center justify-center bg-[#070707]/30 hover:bg-zinc-950/60 border border-dashed border-zinc-800 hover:border-zinc-750 p-6 rounded-xl text-center cursor-pointer transition group">
+                                      <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            setCoverFile(file);
+                                            setCoverRemoved(false);
+                                            setCoverPreviewUrl(URL.createObjectURL(file));
+                                          }
+                                        }} 
+                                      />
+                                      <div className="w-10 h-10 bg-zinc-950 rounded-full flex items-center justify-center mb-3 border border-zinc-900 group-hover:border-zinc-800 transition">
+                                        <UploadCloud className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition" />
+                                      </div>
+                                      <p className="text-xs font-bold text-zinc-400 tracking-tight">Stage Cover Photo</p>
+                                      <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mt-1.5 leading-relaxed">PNG, JPG, or SVG up to 5MB</p>
+                                   </label>
+                                 )}
+                               </div>
+                            </div>
                         </div>
                      </div>
                      <div className="pt-8 border-t border-zinc-900">
