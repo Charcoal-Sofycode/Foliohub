@@ -46,6 +46,7 @@ class Token(BaseModel):
 class TwoFactorVerify(BaseModel):
     email: EmailStr
     code: str
+    trust_device: Optional[bool] = False
 
 class Enable2FARequest(BaseModel):
     password: str
@@ -253,6 +254,10 @@ class ProjectUpdate(BaseModel):
     client_goals: Optional[str] = None
     strategy_notes: Optional[str] = None
     monetization_results: Optional[str] = None
+    sync_offset_ms: Optional[int] = None
+    audio_mode: Optional[str] = None
+    raw_hidden: Optional[bool] = None
+    timeline_markers: Optional[List[dict]] = None
 
 class ProjectCommentCreate(BaseModel):
     timestamp: Optional[int] = None
@@ -305,6 +310,10 @@ class ProjectResponse(BaseModel):
     client_goals: Optional[str] = None
     strategy_notes: Optional[str] = None
     monetization_results: Optional[str] = None
+    sync_offset_ms: Optional[int] = 0
+    audio_mode: Optional[str] = "crossfade"
+    raw_hidden: Optional[bool] = False
+    timeline_markers: Optional[List[dict]] = None
     created_at: datetime
     story: Optional[ProjectStoryResponse] = None
     comments: list["ProjectCommentResponse"] = []

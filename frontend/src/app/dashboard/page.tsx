@@ -45,7 +45,14 @@ import {
   MessageSquare,
   PlayCircle,
   Clock,
-  ExternalLink
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  LifeBuoy,
+  Book,
+  Bug,
+  Lightbulb
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -88,6 +95,7 @@ function DashboardContent() {
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState('projects');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [subTier, setSubTier] = useState('free');
 
   // Upload Modal State
@@ -132,7 +140,8 @@ function DashboardContent() {
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
 
-
+  // Support Menu State
+  const [isSupportMenuOpen, setIsSupportMenuOpen] = useState(false);
   // Settings State
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [agreementFile, setAgreementFile] = useState<File | null>(null);
@@ -935,71 +944,158 @@ function DashboardContent() {
         <div className="flex h-screen overflow-hidden bg-[#050505] flex-col md:flex-row">
           
           {/* SIDEBAR */}
-          <aside className="w-72 border-r border-zinc-900 bg-[#050505] flex-col justify-between hidden md:flex shrink-0">
+          <aside className={`${sidebarCollapsed ? 'w-20' : 'w-72'} border-r border-zinc-900 bg-[#050505] flex-col justify-between hidden md:flex shrink-0 transition-all duration-300 ease-in-out`}>
             <div>
-              <div className="p-8 border-b border-zinc-900">
-                <FolioLogo iconSize={24} />
+              <div className={`p-8 border-b border-zinc-900 flex ${sidebarCollapsed ? 'flex-col items-center gap-4 py-6' : 'items-center justify-between'}`}>
+                {!sidebarCollapsed ? (
+                  <FolioLogo iconSize={24} />
+                ) : (
+                  <div className="group flex items-center justify-center overflow-hidden rounded-[6px] bg-white w-8 h-8 select-none">
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-[60%] h-[60%] text-black" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M5 3l16 9-16 9V3z" />
+                    </svg>
+                  </div>
+                )}
+                <button 
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition duration-200"
+                  title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                >
+                  {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+                </button>
               </div>
 
 
-              <div className="px-6 py-8 flex flex-col gap-2">
-                <p className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-600 mb-4 pl-4">Menu</p>
+              <div className={`px-4 py-8 flex flex-col gap-2 ${sidebarCollapsed ? 'items-center' : ''}`}>
+                {!sidebarCollapsed && <p className="text-xs font-mono uppercase tracking-[0.2em] text-zinc-600 mb-4 pl-4">Menu</p>}
                 
                 <button 
                   onClick={() => setActiveTab('projects')}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'projects' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'projects' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title="Assets"
                 >
-                  <Grid className="w-4 h-4" /> Assets
+                  <Grid className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span>Assets</span>}
                 </button>
                 <button 
                   onClick={() => setActiveTab('analytics')}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'analytics' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title="Telemetry"
                 >
-                  <BarChart className="w-4 h-4" /> Telemetry
+                  <BarChart className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span>Telemetry</span>}
                 </button>
                 <button 
                   onClick={() => setActiveTab('inquiries')}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'inquiries' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'inquiries' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title="Incoming Leads"
                 >
-                  <Mail className="w-4 h-4" /> Incoming Leads
+                  <Mail className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span>Incoming Leads</span>}
                 </button>
                 <button 
                   onClick={() => setActiveTab('settings')}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'settings' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'settings' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title="Configuration"
                 >
-                  <Settings className="w-4 h-4" /> Configuration
+                  <Settings className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span>Configuration</span>}
                 </button>
                 <button 
                   onClick={() => setActiveTab('billing')}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'billing' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'billing' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title="Upgrade Plan"
                 >
-                  <Zap className="w-4 h-4" /> Upgrade Plan
+                  <Zap className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span>Upgrade Plan</span>}
                 </button>
                 <button 
                   onClick={() => setActiveTab('reviews')}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'reviews' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'}`}
+                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition font-medium text-sm tracking-wide ${activeTab === 'reviews' ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2 relative' : ''}`}
+                  title="Client Reviews"
                 >
-                  <MessageSquare className="w-4 h-4" /> Client Reviews
+                  <MessageSquare className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span>Client Reviews</span>}
                   {totalCommentCount > 0 && (
-                    <span className="ml-auto text-[10px] font-mono bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">{totalCommentCount}</span>
+                    sidebarCollapsed ? (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                    ) : (
+                      <span className="ml-auto text-[10px] font-mono bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full">{totalCommentCount}</span>
+                    )
                   )}
                 </button>
               </div>
             </div>
 
-            <div className="p-6 border-t border-zinc-900">
-              <div className="bg-zinc-900/50 rounded-lg p-4 mb-4 border border-zinc-800">
-                <p className="text-[10px] text-zinc-500 font-mono mb-2 uppercase tracking-[0.2em]">Live Production Status</p>
-                <div className="flex items-center justify-between group cursor-pointer" onClick={() => {
-                   const shareUrl = window.location.origin + `/p/${portfolio.subdomain}`;
-                   copyToClipboard(shareUrl);
-                }}>
-                  <span className="text-sm font-medium text-white truncate pr-2">/p/{portfolio.subdomain}</span>
-                  <LinkIcon className="w-3 h-3 text-zinc-500 group-hover:text-white transition" />
+            <div className={`p-6 border-t border-zinc-900 ${sidebarCollapsed ? 'flex flex-col items-center gap-4' : ''}`}>
+              {!sidebarCollapsed ? (
+                <div className="bg-zinc-900/50 rounded-lg p-4 mb-4 border border-zinc-800">
+                  <p className="text-[10px] text-zinc-500 font-mono mb-2 uppercase tracking-[0.2em]">Live Production Status</p>
+                  <div className="flex items-center justify-between group cursor-pointer" onClick={() => {
+                     const shareUrl = window.location.origin + `/p/${portfolio.subdomain}`;
+                     copyToClipboard(shareUrl);
+                  }}>
+                    <span className="text-sm font-medium text-white truncate pr-2">/p/{portfolio.subdomain}</span>
+                    <LinkIcon className="w-3 h-3 text-zinc-500 group-hover:text-white transition" />
+                  </div>
                 </div>
+              ) : (
+                <button 
+                  onClick={() => {
+                     const shareUrl = window.location.origin + `/p/${portfolio.subdomain}`;
+                     copyToClipboard(shareUrl);
+                  }}
+                  className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white transition"
+                  title="Copy Live URL"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                </button>
+              )}
+
+              <div className="relative w-full mb-1">
+                <AnimatePresence>
+                  {isSupportMenuOpen && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className={`absolute z-[200] bg-zinc-900 border border-zinc-800 rounded-lg p-2 flex flex-col gap-1 shadow-2xl ${sidebarCollapsed ? 'left-full bottom-0 ml-4 w-48' : 'bottom-full left-0 mb-2 w-full'}`}
+                    >
+                      <a href="mailto:support@foliohub.media?subject=Help Article Search" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                        <Book className="w-4 h-4 shrink-0 text-emerald-400" />
+                        <span>Search help articles</span>
+                      </a>
+                      <a href="mailto:support@foliohub.media?subject=Bug Report" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                        <Bug className="w-4 h-4 shrink-0 text-amber-400" />
+                        <span>Report a bug</span>
+                      </a>
+                      <a href="mailto:support@foliohub.media?subject=Support Request" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                        <LifeBuoy className="w-4 h-4 shrink-0 text-[#6366f1]" />
+                        <span>Contact support</span>
+                      </a>
+                      <a href="mailto:support@foliohub.media?subject=Feature Request" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                        <Lightbulb className="w-4 h-4 shrink-0 text-pink-400" />
+                        <span>Request a feature</span>
+                      </a>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <button 
+                  onClick={() => setIsSupportMenuOpen(!isSupportMenuOpen)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium text-sm ${isSupportMenuOpen ? 'bg-zinc-900 text-white' : 'text-zinc-500 hover:text-white hover:bg-zinc-900/50'} ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                  title="Support Center"
+                >
+                  <LifeBuoy className={`w-4 h-4 shrink-0 ${isSupportMenuOpen ? 'text-[#6366f1]' : ''}`} />
+                  {!sidebarCollapsed && <span>Support Center</span>}
+                </button>
               </div>
-              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-500 hover:text-white hover:bg-red-500/10 transition font-medium text-sm">
-                <LogOut className="w-4 h-4" /> Disconnect
+              <button 
+                onClick={handleLogout} 
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-500 hover:text-white hover:bg-red-500/10 transition font-medium text-sm ${sidebarCollapsed ? 'justify-center px-2' : ''}`}
+                title="Disconnect"
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                {!sidebarCollapsed && <span>Disconnect</span>}
               </button>
             </div>
           </aside>
@@ -1030,10 +1126,10 @@ function DashboardContent() {
           </nav>
 
           {/* MAIN CONTENT AREA */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-12 relative scroll-smooth bg-[#0a0a0a] pb-24 md:pb-12">
+          <main className="flex-1 overflow-y-auto p-4 md:p-8 md:pt-6 relative scroll-smooth bg-[#0a0a0a] pb-24 md:pb-12">
             <div className="max-w-6xl mx-auto pb-24">
               
-              <header className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-12 border-b border-zinc-900 pb-10">
+              <header className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-6 border-b border-zinc-900 pb-5">
                 <div className="text-center md:text-left">
                   <h2 className="text-4xl font-bold tracking-tighter mb-2 capitalize">{activeTab}</h2>
                   <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-[0.2em]">Master Control Panel</p>
@@ -1057,14 +1153,56 @@ function DashboardContent() {
                   {/* Global Style Fingerprint */}
                   <StyleFingerprint editable={true} />
 
+                  {/* Dynamic Creator Workspace Metrics */}
+                  {(() => {
+                    const projectsList = portfolio?.projects || [];
+                    const totalAssets = projectsList.length;
+                    const publishedAssets = projectsList.filter((p: any) => p.status === 'published' || !p.status).length;
+                    const pendingReviews = projectsList.filter((p: any) => p.status === 'needs_revision' || p.status === 'review_needed').length;
+                    const totalViews = projectsList.reduce((acc: number, p: any) => acc + (p.view_count || 0), 0);
+
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-[#050505] border border-zinc-900 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-800 transition duration-200 shadow-md">
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em]">Total Assets</span>
+                          <div className="flex items-baseline gap-2 mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{totalAssets}</span>
+                            <span className="text-[10px] text-zinc-600 font-mono">items</span>
+                          </div>
+                        </div>
+                        <div className="bg-[#050505] border border-zinc-900 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-800 transition duration-200 shadow-md">
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em]">Published</span>
+                          <div className="flex items-baseline gap-2 mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-emerald-400">{publishedAssets}</span>
+                            <span className="text-[10px] text-zinc-600 font-mono">online</span>
+                          </div>
+                        </div>
+                        <div className="bg-[#050505] border border-zinc-900 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-800 transition duration-200 shadow-md">
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em]">In Review</span>
+                          <div className="flex items-baseline gap-2 mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-amber-400">{pendingReviews}</span>
+                            <span className="text-[10px] text-zinc-600 font-mono">pending</span>
+                          </div>
+                        </div>
+                        <div className="bg-[#050505] border border-zinc-900 rounded-xl p-4 flex flex-col justify-between hover:border-zinc-800 transition duration-200 shadow-md">
+                          <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em]">Asset Impressions</span>
+                          <div className="flex items-baseline gap-2 mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{totalViews}</span>
+                            <span className="text-[10px] text-zinc-600 font-mono">views</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Project Filters */}
-                  <div className="flex flex-col md:flex-row items-center gap-4 bg-[#050505] p-4 rounded-xl border border-zinc-900">
+                  <div className="flex flex-col md:flex-row items-center gap-4 bg-[#050505] p-4 rounded-xl border border-zinc-900/80 shadow-lg shadow-black/30">
                     <div className="relative flex-1 w-full">
-                      <Eye className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                       <input 
                         type="text" 
                         placeholder="Search assets by title or description..." 
-                        className="w-full bg-black/40 border border-zinc-800 rounded-lg pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-zinc-500 transition"
+                        className="w-full bg-zinc-950/80 hover:bg-zinc-950 focus:bg-black border border-zinc-800 hover:border-zinc-700/80 focus:border-zinc-300 rounded-lg pl-11 pr-4 py-3 text-sm text-white outline-none transition-all duration-300 focus:ring-1 focus:ring-zinc-300/20"
                         value={projectSearch}
                         onChange={(e) => setProjectSearch(e.target.value)}
                       />
@@ -1100,7 +1238,7 @@ function DashboardContent() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 items-start">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
                   {(() => {
                     const filtered = (portfolio?.projects || []).filter((p: any) => {
                       const matchesSearch = p.title.toLowerCase().includes(projectSearch.toLowerCase()) || 
@@ -1117,9 +1255,9 @@ function DashboardContent() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.05 }}
                           key={project.id} 
-                          className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-700 transition duration-300 flex flex-col"
+                          className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-500 hover:scale-[1.015] hover:shadow-[0_0_30px_rgba(255,255,255,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col h-full"
                         >
-                          <div className="bg-black relative overflow-hidden flex-shrink-0">
+                          <div className="bg-black relative overflow-hidden flex-shrink-0 aspect-video w-full border-b border-zinc-900/50">
                             {project.raw_media_url && project.media_url ? (
                               <BeforeAfterPlayer 
                               rawUrl={project.raw_media_url} 
@@ -1155,7 +1293,7 @@ function DashboardContent() {
                                  }}
                                  className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-black transition pointer-events-auto"
                                  title="Edit Metadata"
-                               >
+                                >
                                  <Edit className="w-3.5 h-3.5" />
                                </button>
                                <button 
@@ -1174,10 +1312,18 @@ function DashboardContent() {
                                </button>
                             </div>
                           </div>
-                          <div className="p-6 flex-1 flex flex-col">
-                            <h3 className="text-lg font-bold truncate text-white mb-2">{project.title}</h3>
+                          
+                          <div 
+                            onClick={() => window.open(window.location.origin + '/review/' + project.id, '_blank')}
+                            className="p-6 flex-1 flex flex-col cursor-pointer hover:bg-zinc-950/20 transition-colors"
+                          >
+                            <h3 className="text-lg font-bold truncate text-white mb-2 group-hover:text-zinc-200 transition-colors flex items-center gap-2">
+                              {project.title}
+                              <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-zinc-400 transition-all duration-300 shrink-0" />
+                            </h3>
                             <p className="text-zinc-500 text-sm line-clamp-2 font-light flex-1">{project.description || 'No metadata provided.'}</p>
-                            <div className="mt-6 flex items-center justify-between border-t border-zinc-900 pt-4">
+                            
+                            <div className="mt-6 flex items-center justify-between border-t border-zinc-900 pt-4" onClick={(e) => e.stopPropagation()}>
                                <div className="flex items-center gap-4 text-[11px] text-zinc-500 font-mono uppercase tracking-widest">
                                 <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /> {project.view_count || 0}</span>
                                 {(project.comments?.length > 0) && (
@@ -1185,22 +1331,53 @@ function DashboardContent() {
                                     <MessageSquare className="w-3.5 h-3.5" /> {project.comments.length}
                                   </span>
                                 )}
-                                <span className="flex items-center gap-1.5 text-white/50">
-                                  {project.status === 'approved' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
-                                  {project.status || 'Published'}
-                                </span>
+                                {(() => {
+                                  const status = project.status || 'published';
+                                  if (status === 'approved') {
+                                    return (
+                                      <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        Approved
+                                      </span>
+                                    );
+                                  } else if (status === 'needs_revision' || status === 'review_needed') {
+                                    return (
+                                      <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium tracking-wider uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                        Review Needed
+                                      </span>
+                                    );
+                                  } else if (status === 'rejected') {
+                                    return (
+                                      <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium tracking-wider uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                                        Rejected
+                                      </span>
+                                    );
+                                  } else {
+                                    return (
+                                      <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium tracking-wider uppercase bg-zinc-500/10 text-zinc-400 border border-zinc-500/20">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                                        Published
+                                      </span>
+                                    );
+                                  }
+                                })()}
                               </div>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const reviewUrl = window.location.origin + `/review/${project.id}`;
-                                  navigator.clipboard.writeText(reviewUrl);
-                                  alert("Client Review Link copied to clipboard!");
-                                }}
-                                className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-1.5 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center gap-2"
-                              >
-                                <LinkIcon className="w-3 h-3" /> Share Review Link
-                              </button>
+                              {subTier === 'premium' && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const reviewUrl = window.location.origin + `/review/${project.id}`;
+                                    navigator.clipboard.writeText(reviewUrl);
+                                    alert("Client Review Link copied to clipboard!");
+                                  }}
+                                  className="p-2 border border-zinc-900 rounded-lg bg-zinc-950/60 hover:bg-zinc-900 hover:border-zinc-800 hover:text-white transition-all text-zinc-400 flex items-center justify-center shrink-0"
+                                  title="Copy Client Review Link"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                           <ProjectStoryTimeline
@@ -1348,6 +1525,20 @@ function DashboardContent() {
 
 
               {activeTab === 'reviews' && (
+                subTier !== 'premium' ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-center max-w-lg mx-auto">
+                    <div className="w-20 h-20 bg-[#6366f1]/10 rounded-full flex items-center justify-center mb-6 border border-[#6366f1]/20">
+                      <MessageSquare className="w-10 h-10 text-[#6366f1]" />
+                    </div>
+                    <h2 className="text-3xl font-black font-display uppercase tracking-tight mb-4">Client Review Room</h2>
+                    <p className="text-zinc-400 font-light mb-8">
+                      Streamline your approval process. Get timestamped feedback directly on your videos from clients without them needing an account.
+                    </p>
+                    <button onClick={() => setActiveTab('billing')} className="bg-[#6366f1] text-white px-8 py-4 rounded-lg font-bold uppercase tracking-widest text-[11px] hover:bg-[#4f46e5] transition shadow-[0_0_20px_rgba(99,102,241,0.4)]">
+                      Upgrade to Unlock
+                    </button>
+                  </motion.div>
+                ) : (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-8">
                   {/* KPI Summary */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1490,6 +1681,7 @@ function DashboardContent() {
                     ))
                   )}
                 </motion.div>
+                )
               )}
 
               {activeTab === 'settings' && (
@@ -1925,7 +2117,7 @@ function DashboardContent() {
                         <span className="text-zinc-500 font-mono text-sm"> / forever</span>
                       </div>
                       <div className="flex-1 space-y-4 mb-8">
-                        {['5 Maximum Projects Uploaded', 'Standard Video Quality', 'Basic Heatmap Analytics', 'Community Support'].map((feature, i) => (
+                        {['5 Maximum Video Projects', 'Web-Optimized Video Quality', 'Interactive Slider Player', 'Contact Form Lead Gen', 'Basic Telemetry Analytics'].map((feature, i) => (
                           <div key={i} className="flex items-center gap-3">
                             <Check className={`w-4 h-4 ${subTier === 'free' ? 'text-[#6366f1]' : 'text-zinc-600'}`} />
                             <span className="text-zinc-300 font-light">{feature}</span>
@@ -1963,7 +2155,7 @@ function DashboardContent() {
                         <span className="text-zinc-500 font-mono text-sm"> / month</span>
                       </div>
                       <div className="flex-1 space-y-4 mb-8">
-                        {['Unlimited Projects Uploads', '4K / Lossless Quality Video Player', 'Advanced Telemetry & Analytics Dashboard', 'Custom Domain Mapping', 'Priority Feature Access'].map((feature, i) => (
+                        {['Unlimited Video Projects', '4K / Studio Lossless Quality', 'Custom Domain Mapping', 'Client Review Room', 'Advanced Heatmap Analytics', 'Priority Support'].map((feature, i) => (
                           <div key={i} className="flex items-center gap-3">
                             <Check className="w-4 h-4 text-[#818cf8]" />
                             <span className="text-white font-medium">{feature}</span>

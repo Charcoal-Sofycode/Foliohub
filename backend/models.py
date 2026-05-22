@@ -23,6 +23,7 @@ class User(Base):
     two_factor_code = Column(String, nullable=True)
     # Relationships
     portfolio = relationship("Portfolio", back_populates="owner", uselist=False, cascade="all, delete-orphan")
+    trusted_devices = relationship("TrustedDevice", back_populates="user", cascade="all, delete-orphan")
 
 class Portfolio(Base):
     __tablename__ = "portfolios"
@@ -129,6 +130,12 @@ class Project(Base):
     optimized_url = Column(String, nullable=True) # Optimized H.264 version
     transcoding_status = Column(String, default="pending") # "pending", "processing", "completed", "failed"
     thumbnail_url = Column(String, nullable=True)
+
+    # Split View Settings
+    sync_offset_ms = Column(Integer, default=0, nullable=True)
+    audio_mode = Column(String, default="crossfade", nullable=True)
+    raw_hidden = Column(Boolean, default=False, nullable=True)
+    timeline_markers = Column(JSON, nullable=True)
     
     view_count = Column(Integer, default=0)
     is_published = Column(Boolean, default=True)
@@ -211,3 +218,17 @@ class SignupOTP(Base):
     otp_code = Column(String(6), nullable=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class TrustedDevice(Base):
+    __tablename__ = "trusted_devices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token_hash = Column(String, index=True, nullable=False)
+    device_name = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime, nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="trusted_devices")

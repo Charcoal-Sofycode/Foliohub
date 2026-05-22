@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Play, Volume2, VolumeX, X, Settings } from 'lucide-react';
 
@@ -27,6 +28,20 @@ export default function PortfolioPlayer({
   const isPremium = subscriptionTier === 'premium';
   const [selectedQuality, setSelectedQuality] = useState(isPremium && !optimizedUrl ? '4K Lossless' : 'Web Optimized');
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Callback ref to auto-play theater video immediately when mounted
+  const theaterVideoRef = (node: HTMLVideoElement | null) => {
+    if (node) {
+      const playPromise = node.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.warn("Unmuted autoplay blocked by browser. Attempting muted autoplay:", error);
+          node.muted = true;
+          node.play().catch(() => {});
+        });
+      }
+    }
+  };
 
   // Source priority: Optimized > URL
   const activeUrl = (optimizedUrl && transcodingStatus === 'completed') ? optimizedUrl : url;
@@ -67,10 +82,17 @@ export default function PortfolioPlayer({
     <>
       {/* Inline Card Player */}
       <div 
-        className="relative w-full h-full bg-[#050505] group cursor-pointer overflow-hidden border-zinc-900"
+        className="relative w-full bg-[#050505] group cursor-pointer overflow-hidden border border-white/5 rounded-xl"
+        style={{ 
+          aspectRatio: aspectRatio ? aspectRatio : 1.777,
+          maxHeight: '82vh',
+        } as any}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onClick={() => setIsFullscreen(true)}
+        onClick={() => {
+          setIsMuted(false);
+          setIsFullscreen(true);
+        }}
         onContextMenu={(e) => e.preventDefault()}
       >
         <video
@@ -78,7 +100,7 @@ export default function PortfolioPlayer({
           src={activeUrl}
           poster={thumbnailUrl}
           className={`w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${isProcessing ? 'opacity-30 grayscale' : ''}`}
-          muted={isMuted}
+          muted={true}
           loop
           playsInline
           onLoadedMetadata={(e) => {
@@ -132,73 +154,86 @@ export default function PortfolioPlayer({
       </div>
 
       {/* Theater / Fullscreen Mode */}
-      <AnimatePresence>
-        {isFullscreen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/98 backdrop-blur-[100px] flex items-center justify-center p-4 md:p-8 lg:p-12 overflow-hidden"
-          >
-             {/* Security Layer Overlay */}
+      {typeof window !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isFullscreen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[2147483647] bg-black/98 backdrop-blur-[100px] flex items-center justify-center p-4 md:p-8 lg:p-12 overflow-hidden"
+            >
+               {/* Security Layer Overlay */}
              <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black to-transparent z-10 pointer-events-none" />
              <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none" />
 
-             <button 
-               onClick={() => { setIsFullscreen(false); }}
-               className="absolute top-6 right-6 lg:top-10 lg:right-10 w-12 h-12 bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all z-20"
-             >
-               <X className="w-6 h-6" />
-             </button>
-             
-             <div className="absolute top-6 left-6 lg:top-10 lg:left-10 text-white z-20 flex flex-col md:flex-row md:items-center gap-6 md:gap-12">
-                <div className="max-w-xl">
-                   <div className="flex items-center gap-2 mb-1">
-                      <span className="w-2 h-2 bg-white rounded-full" />
-                      <p className="text-[9px] uppercase font-mono tracking-[0.4em] text-zinc-500">
-                        {isProcessing ? 'Studio Master: Processing' : 'Studio Master: Live'}
-                      </p>
-                   </div>
-                   <h3 className="text-3xl font-black tracking-tighter uppercase leading-none">{title || "Untitled Masterpiece"}</h3>
+             {/* Left side actions bar (Vertical Stack) */}
+             <div className="absolute top-6 left-6 lg:top-10 lg:left-10 flex flex-col gap-3 z-30">
+               {/* Close Button */}
+               <button 
+                 onClick={() => { 
+                   setIsFullscreen(false);
+                   setIsMuted(true);
+                 }}
+                 className="w-12 h-12 bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all shadow-lg shadow-black/20"
+                 title="Exit Focus Mode"
+               >
+                 <X className="w-5 h-5" />
+               </button>
+
+               {/* Quality Selector Button */}
+               {!isProcessing && (
+                 <div className="relative">
+                   <button 
+                     disabled={!isPremium}
+                     onClick={() => setQualityOpen(!qualityOpen)}
+                     className={`w-12 h-12 bg-white/5 border text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all shadow-lg shadow-black/20 relative
+                       ${isPremium ? 'border-white/10 cursor-pointer' : 'border-zinc-900 text-zinc-600 cursor-not-allowed'}`}
+                     title={`Quality: ${selectedQuality}`}
+                   >
+                     {isPremium && (
+                       <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#818cf8] border-2 border-black animate-pulse" />
+                     )}
+                     <Settings className="w-5 h-5" />
+                   </button>
+                   
+                   <AnimatePresence>
+                     {qualityOpen && isPremium && (
+                       <motion.div 
+                         initial={{ opacity: 0, x: -10 }} 
+                         animate={{ opacity: 1, x: 0 }} 
+                         exit={{ opacity: 0, x: -10 }}
+                         className="absolute left-full top-0 ml-4 w-56 bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.5)] z-[250]"
+                       >
+                         {[
+                           {id: 'raw', label: '4K Lossless', sub: 'Native Quality (Slower)'},
+                           {id: 'web', label: 'Web Optimized', sub: 'Instant Playback'},
+                         ].map(q => (
+                            <button 
+                              key={q.id}
+                              onClick={() => { setSelectedQuality(q.label); setQualityOpen(false); }}
+                              className={`text-left px-5 py-4 transition flex flex-col gap-1 ${selectedQuality === q.label ? 'bg-white text-black' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'}`}
+                            >
+                              <span className="text-[11px] font-bold tracking-[0.1em] uppercase">{q.label}</span>
+                              <span className="text-[8px] font-mono uppercase opacity-60">{q.sub}</span>
+                            </button>
+                         ))}
+                       </motion.div>
+                     )}
+                   </AnimatePresence>
+                 </div>
+               )}
+             </div>
+
+             {/* Info overlay (Shifted right of button stack) */}
+             <div className="absolute top-6 left-24 lg:top-10 lg:left-32 text-white z-20 flex flex-col max-w-[calc(100vw-12rem)] md:max-w-xl">
+                <div className="flex items-center gap-2 mb-1">
+                   <span className="w-1.5 h-1.5 bg-[#818cf8] rounded-full animate-pulse" />
+                   <p className="text-[9px] uppercase font-mono tracking-[0.4em] text-zinc-500">
+                     {isProcessing ? 'Studio Master: Processing' : 'Studio Master: Live'}
+                   </p>
                 </div>
-                
-                {/* --- QUALITY BADGE & SELECTOR --- */}
-                {!isProcessing && (
-                  <div className="relative pt-2 md:pt-0">
-                     <button 
-                       disabled={!isPremium}
-                       onClick={() => setQualityOpen(!qualityOpen)}
-                       className={`flex items-center gap-3 px-6 py-3 bg-zinc-900/40 border rounded-full text-[10px] font-bold uppercase tracking-[0.2em] transition-all
-                         ${isPremium ? 'border-zinc-800 hover:bg-white hover:text-black' : 'border-zinc-900 text-zinc-600 cursor-not-allowed'}`}
-                     >
-                       <div className={`w-1.5 h-1.5 rounded-full ${isPremium ? 'bg-[#818cf8] animate-pulse shadow-[0_0_8px_#818cf8]' : 'bg-zinc-500'}`} />
-                       {selectedQuality}
-                     </button>
-                     
-                     <AnimatePresence>
-                       {qualityOpen && isPremium && (
-                         <motion.div 
-                           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                           className="absolute top-full left-0 mt-4 w-56 bg-[#0a0a0a] border border-zinc-800 rounded-2xl overflow-hidden flex flex-col shadow-[0_30px_60px_rgba(0,0,0,0.5)] z-[250]"
-                         >
-                           {[
-                             {id: 'raw', label: '4K Lossless', sub: 'Native Quality (Slower)'},
-                             {id: 'web', label: 'Web Optimized', sub: 'Instant Playback'},
-                           ].map(q => (
-                              <button 
-                                key={q.id}
-                                onClick={() => { setSelectedQuality(q.label); setQualityOpen(false); }}
-                                className={`text-left px-5 py-5 transition flex flex-col gap-1.5 ${selectedQuality === q.label ? 'bg-white text-black' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'}`}
-                              >
-                                <span className="text-[11px] font-bold tracking-[0.1em] uppercase">{q.label}</span>
-                                <span className="text-[8px] font-mono uppercase opacity-60">{q.sub}</span>
-                              </button>
-                           ))}
-                         </motion.div>
-                       )}
-                     </AnimatePresence>
-                  </div>
-                )}
+                <h3 className="text-2xl md:text-3xl font-black tracking-tighter uppercase leading-none truncate">{title || "Untitled Masterpiece"}</h3>
              </div>
 
              <motion.div 
@@ -206,7 +241,7 @@ export default function PortfolioPlayer({
                animate={{ scale: 1, opacity: 1, y: 0 }}
                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                className="w-full max-w-6xl bg-[#020202] relative border border-white/5 shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden rounded-2xl z-10"
-               style={{ aspectRatio: aspectRatio || '16/9', maxHeight: '85vh' }}
+               style={{ aspectRatio: aspectRatio || 1.777, maxHeight: '85vh' }}
              >
                 {isProcessing ? (
                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] p-12 text-center">
@@ -221,16 +256,16 @@ export default function PortfolioPlayer({
                   >
                     <video
                       key={selectedQuality}
-                      src={selectedQuality === '4K Lossless' ? url : (optimizedUrl || url)}
+                      ref={theaterVideoRef}
+                      src={selectedQuality === '4K Lossless' ? url : activeUrl}
                       poster={thumbnailUrl}
                       className="w-full h-full object-contain"
                       autoPlay
-                      muted={isMuted} // Match initial state or allow autoplay
+                      muted={isMuted}
                       controls
                       controlsList="nodownload noplaybackrate"
                       disablePictureInPicture
                       playsInline
-                      onPlay={() => setIsMuted(false)} // Try to unmute if user allows
                     />
                   </div>
                 )}
@@ -241,8 +276,10 @@ export default function PortfolioPlayer({
                 Studio Viewport Focus Mode
              </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   );
 }

@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [is2FAStep, setIs2FAStep] = useState(false);
+  const [trustDevice, setTrustDevice] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +28,7 @@ export default function LoginPage() {
     try {
       if (is2FAStep) {
         // Handle 2FA verification
-        const res = await api.post('/verify-2fa', { email, code: twoFactorCode });
+        const res = await api.post('/verify-2fa', { email, code: twoFactorCode, trust_device: trustDevice });
         localStorage.setItem('token', res.data.access_token);
         router.push('/dashboard');
       } else {
@@ -135,6 +136,27 @@ export default function LoginPage() {
                   placeholder="••••••"
                   maxLength={12}
                 />
+
+                {/* Custom Checkbox */}
+                <div 
+                  className="flex items-center gap-3 pt-6 select-none cursor-pointer group/check font-sans" 
+                  onClick={() => setTrustDevice(!trustDevice)}
+                >
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-300 ${
+                    trustDevice 
+                      ? 'border-white bg-white text-black' 
+                      : 'border-zinc-700 bg-transparent group-hover/check:border-zinc-400'
+                  }`}>
+                    {trustDevice && (
+                      <svg className="w-3.5 h-3.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-sm text-zinc-400 font-mono tracking-wide group-hover/check:text-zinc-200 transition-colors select-none">
+                    Trust this device for 30 days
+                  </span>
+                </div>
               </div>
             ) : (
               <>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Maximize2, MoveHorizontal, X, Volume2, VolumeX, AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -26,6 +27,9 @@ interface BeforeAfterPlayerProps {
   onDurationChange?: (duration: number) => void;
   videoRef?: React.RefObject<HTMLVideoElement | null>;
   qualityBadgeClassName?: string;
+  syncOffsetMs?: number;
+  audioMode?: 'crossfade' | 'final_only' | 'raw_only';
+  timelineMarkers?: Array<{ timestamp: number; label: string; color?: string }>;
 }
 
 export default forwardRef(function BeforeAfterPlayer({ 
@@ -49,7 +53,10 @@ export default forwardRef(function BeforeAfterPlayer({
   onTimeUpdate,
   onDurationChange,
   videoRef: externalVideoRef,
-  qualityBadgeClassName
+  qualityBadgeClassName,
+  syncOffsetMs = 0,
+  audioMode = 'crossfade',
+  timelineMarkers = []
 }: BeforeAfterPlayerProps, ref) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -87,16 +94,19 @@ export default forwardRef(function BeforeAfterPlayer({
     const watchingRaw = pos > 60;
     const watchingFinal = pos < 40;
 
+    const offsetSec = syncOffsetMs / 1000;
+    const targetRawTime = Math.max(0, Math.min(raw.duration || Infinity, final.currentTime + offsetSec));
+
     // A. Playback Control & Sync Logic
     if (inCenter) {
       // Both must play and sync
       if (final.paused && isPlaying) final.play().catch(() => {});
       if (raw.paused && isPlaying) raw.play().catch(() => {});
       
-      // Sync raw to final
-      const drift = final.currentTime - raw.currentTime;
+      // Sync raw to final with offset
+      const drift = targetRawTime - raw.currentTime;
       if (Math.abs(drift) > 0.15) {
-        raw.currentTime = final.currentTime;
+        raw.currentTime = targetRawTime;
       } else if (Math.abs(drift) > 0.01) {
         raw.playbackRate = final.playbackRate * (1 + drift * 0.5);
       }
@@ -115,27 +125,52 @@ export default forwardRef(function BeforeAfterPlayer({
     
     // Update time display directly in DOM (High Performance)
     if (timeDisplayRef.current) {
-      const minutes = Math.floor(leader.currentTime / 60);
-      const seconds = Math.floor(leader.currentTime % 60);
+      // If raw is the leader, subtract offset to show the aligned timeline progress
+      const displayTime = watchingRaw ? Math.max(0, leader.currentTime - offsetSec) : leader.currentTime;
+      const minutes = Math.floor(displayTime / 60);
+      const seconds = Math.floor(displayTime % 60);
       timeDisplayRef.current.innerText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
 
-    if (onTimeUpdate) onTimeUpdate(leader.currentTime);
+    if (onTimeUpdate) {
+      const displayTime = watchingRaw ? Math.max(0, leader.currentTime - offsetSec) : leader.currentTime;
+      onTimeUpdate(displayTime);
+    }
 
     // Update progress bar directly in DOM
     if (progressBarRef.current && leader.duration) {
-      const progress = (leader.currentTime / leader.duration) * 100;
+      const displayTime = watchingRaw ? Math.max(0, leader.currentTime - offsetSec) : leader.currentTime;
+      const duration = watchingRaw ? Math.max(0.1, leader.duration - offsetSec) : leader.duration;
+      const progress = (displayTime / duration) * 100;
       progressBarRef.current.style.width = `${progress}%`;
     }
 
     // Update volume based on slider directly
     if (!isMuted) {
-      const rawVol = Math.max(0, Math.min(1, pos / 100));
-      const finalVol = Math.max(0, Math.min(1, (100 - pos) / 100));
-      raw.volume = rawVol;
-      final.volume = finalVol;
-      raw.muted = rawVol < 0.01;
-      final.muted = finalVol < 0.01;
+      if (audioMode === 'final_only') {
+        raw.volume = 0;
+        raw.muted = true;
+        final.volume = 1;
+        final.muted = false;
+      } else if (audioMode === 'raw_only') {
+        raw.volume = 1;
+        raw.muted = false;
+        final.volume = 0;
+        final.muted = true;
+      } else {
+        // Crossfade
+        const rawVol = Math.max(0, Math.min(1, pos / 100));
+        const finalVol = Math.max(0, Math.min(1, (100 - pos) / 100));
+        raw.volume = rawVol;
+        final.volume = finalVol;
+        raw.muted = rawVol < 0.01;
+        final.muted = finalVol < 0.01;
+      }
+    } else {
+      raw.volume = 0;
+      final.volume = 0;
+      raw.muted = true;
+      final.muted = true;
     }
 
     // C. Continue Loop if master state is playing
@@ -146,7 +181,7 @@ export default forwardRef(function BeforeAfterPlayer({
         requestAnimationFrame(updateLoop);
       }
     }
-  }, [isMuted, isPlaying]);
+  }, [isMuted, isPlaying, syncOffsetMs, audioMode]);
 
   useEffect(() => {
     const raw = rawVideoRef.current;
@@ -157,6 +192,7 @@ export default forwardRef(function BeforeAfterPlayer({
 
   useEffect(() => {
     const leader = finalVideoRef.current;
+    const raw = rawVideoRef.current;
     if (!leader) return;
 
     const handlePlay = () => {
@@ -172,15 +208,47 @@ export default forwardRef(function BeforeAfterPlayer({
 
     const handleSeeked = () => {
       if (rawVideoRef.current && finalVideoRef.current) {
-        rawVideoRef.current.currentTime = finalVideoRef.current.currentTime;
+        const offsetSec = syncOffsetMs / 1000;
+        rawVideoRef.current.currentTime = Math.max(0, Math.min(rawVideoRef.current.duration || Infinity, finalVideoRef.current.currentTime + offsetSec));
+      }
+    };
+
+    // Buffer Synchronization
+    const handleWaiting = () => {
+      if (isPlaying) {
+        rawVideoRef.current?.pause();
+        finalVideoRef.current?.pause();
+      }
+    };
+
+    const handlePlaying = () => {
+      if (isPlaying) {
+        const pos = sliderPosRef.current;
+        if (pos > 60) {
+          rawVideoRef.current?.play().catch(() => {});
+        } else if (pos < 40) {
+          finalVideoRef.current?.play().catch(() => {});
+        } else {
+          if ((rawVideoRef.current?.readyState ?? 0) >= 3 && (finalVideoRef.current?.readyState ?? 0) >= 3) {
+            rawVideoRef.current?.play().catch(() => {});
+            finalVideoRef.current?.play().catch(() => {});
+          }
+        }
       }
     };
 
     leader.addEventListener('play', handlePlay);
     leader.addEventListener('pause', handlePause);
     leader.addEventListener('seeked', handleSeeked);
-    rawVideoRef.current?.addEventListener('play', handlePlay);
-    rawVideoRef.current?.addEventListener('pause', handlePause);
+    leader.addEventListener('waiting', handleWaiting);
+    leader.addEventListener('playing', handlePlaying);
+    
+    if (raw) {
+      raw.addEventListener('play', handlePlay);
+      raw.addEventListener('pause', handlePause);
+      raw.addEventListener('waiting', handleWaiting);
+      raw.addEventListener('playing', handlePlaying);
+    }
     
     // Initial check
     if (!leader.paused || !rawVideoRef.current?.paused) handlePlay();
@@ -189,10 +257,16 @@ export default forwardRef(function BeforeAfterPlayer({
       leader.removeEventListener('play', handlePlay);
       leader.removeEventListener('pause', handlePause);
       leader.removeEventListener('seeked', handleSeeked);
-      rawVideoRef.current?.removeEventListener('play', handlePlay);
-      rawVideoRef.current?.removeEventListener('pause', handlePause);
+      leader.removeEventListener('waiting', handleWaiting);
+      leader.removeEventListener('playing', handlePlaying);
+      if (raw) {
+        raw.removeEventListener('play', handlePlay);
+        raw.removeEventListener('pause', handlePause);
+        raw.removeEventListener('waiting', handleWaiting);
+        raw.removeEventListener('playing', handlePlaying);
+      }
     };
-  }, [updateLoop, finalVideoRef]);
+  }, [updateLoop, finalVideoRef, syncOffsetMs]);
 
   // External playback control sync
   useEffect(() => {
@@ -291,7 +365,10 @@ export default forwardRef(function BeforeAfterPlayer({
     const final = finalVideoRef.current;
     const raw = rawVideoRef.current;
     if (final) final.currentTime = time;
-    if (raw) raw.currentTime = time;
+    if (raw) {
+      const offsetSec = syncOffsetMs / 1000;
+      raw.currentTime = Math.max(0, Math.min(raw.duration || Infinity, time + offsetSec));
+    }
     if (onTimeUpdate) onTimeUpdate(time);
     
     // Update progress bar immediately for visual feedback
@@ -390,11 +467,15 @@ export default forwardRef(function BeforeAfterPlayer({
       </div>
 
       <div 
-        className="absolute inset-y-0 z-50 w-1 bg-white cursor-ew-resize flex items-center justify-center touch-none"
+        className="absolute inset-y-0 z-50 w-10 -ml-5 cursor-ew-resize flex items-center justify-center touch-none group/divider"
         style={{ left: 'var(--slider-pos)' }}
         onPointerDown={(e) => { e.stopPropagation(); isDraggingRef.current = true; handlePointerMove(e); }}
       >
-        <div className="w-10 h-10 bg-white rounded-full shadow-2xl flex items-center justify-center">
+        {/* Sleek Visual Divider Line */}
+        <div className="absolute inset-y-0 w-1 bg-white" />
+        
+        {/* Grab Circle Handle */}
+        <div className="w-10 h-10 bg-white rounded-full shadow-2xl flex items-center justify-center relative z-10 transition-transform group-hover/divider:scale-110">
            <MoveHorizontal className="w-5 h-5 text-black" />
         </div>
       </div>
@@ -429,6 +510,36 @@ export default forwardRef(function BeforeAfterPlayer({
 
       {!hideControls && (
         <div className="absolute inset-x-0 bottom-0 z-50 p-6 bg-gradient-to-t from-black to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+           {/* Timeline Markers */}
+           {timelineMarkers && timelineMarkers.length > 0 && (
+             <div className="flex flex-wrap items-center gap-2 mb-4">
+               <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">Jump to:</span>
+               {timelineMarkers.map((marker, idx) => {
+                 const colorClass = marker.color === 'purple' ? 'bg-purple-500/10 text-purple-300 border-purple-500/30 hover:bg-purple-500/20' :
+                                    marker.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20' :
+                                    marker.color === 'amber' ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20' :
+                                    'bg-white/5 text-zinc-300 border-white/10 hover:bg-white/10';
+                 return (
+                   <button
+                     key={idx}
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       const final = finalVideoRef.current;
+                       const raw = rawVideoRef.current;
+                       if (final) final.currentTime = marker.timestamp;
+                       if (raw) {
+                         const offsetSec = syncOffsetMs / 1000;
+                         raw.currentTime = Math.max(0, Math.min(raw.duration || Infinity, marker.timestamp + offsetSec));
+                       }
+                     }}
+                     className={`px-3 py-1 text-[9px] uppercase tracking-wider font-semibold border rounded-full backdrop-blur-md transition-all duration-300 ${colorClass}`}
+                   >
+                     {marker.label}
+                   </button>
+                 );
+               })}
+             </div>
+           )}
            <div className="flex items-center gap-4">
               <button onClick={togglePlay} className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center shrink-0">
                  {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
@@ -532,34 +643,39 @@ export default forwardRef(function BeforeAfterPlayer({
 
   // If in fullscreen mode
   if (isFullscreen) {
-    return (
+    if (typeof window === 'undefined') return null;
+    return createPortal(
       <div className="fixed inset-0 z-[2147483647] bg-black/98 backdrop-blur-[100px] flex items-center justify-center p-4 md:p-8 lg:p-12 overflow-hidden">
         {/* Security Layer Overlay */}
         <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black to-transparent z-10 pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black to-transparent z-10 pointer-events-none" />
 
-        {/* Close Button */}
-        <button 
-          onClick={() => {
-            setIsFullscreen(false);
-          }}
-          className="absolute top-6 right-6 lg:top-10 lg:right-10 w-12 h-12 bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all z-20"
-        >
-          <X className="w-6 h-6" />
-        </button>
-        
-        {/* Info overlay (just like PortfolioPlayer) */}
-        <div className="absolute top-6 left-6 lg:top-10 lg:left-10 text-white z-20 flex flex-col md:flex-row md:items-center gap-6 md:gap-12">
-           <div className="max-w-xl">
-              <div className="flex items-center gap-2 mb-1">
-                 <span className="w-2 h-2 bg-indigo-400 animate-pulse" />
-                 <p className="text-[9px] uppercase font-mono tracking-[0.4em] text-zinc-500">
-                   Before & After slider comparison
-                 </p>
-              </div>
-              <h3 className="text-3xl font-black tracking-tighter uppercase leading-none">{title || "Untitled Masterpiece"}</h3>
-           </div>
-        </div>
+         {/* Left side actions bar (Vertical Stack) */}
+         <div className="absolute top-6 left-6 lg:top-10 lg:left-10 flex flex-col gap-3 z-30">
+           {/* Close Button */}
+           <button 
+             onClick={() => {
+               setIsFullscreen(false);
+             }}
+             className="w-12 h-12 bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all z-20"
+             title="Exit Focus Mode"
+           >
+             <X className="w-5 h-5" />
+           </button>
+         </div>
+         
+         {/* Info overlay (Shifted right of button stack) */}
+         <div className="absolute top-6 left-24 lg:top-10 lg:left-32 text-white z-20 flex flex-col max-w-[calc(100vw-12rem)] md:max-w-xl">
+            <div className="max-w-xl">
+               <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 bg-[#818cf8] rounded-full animate-pulse" />
+                  <p className="text-[9px] uppercase font-mono tracking-[0.4em] text-zinc-500">
+                    Before & After slider comparison
+                  </p>
+               </div>
+               <h3 className="text-2xl md:text-3xl font-black tracking-tighter uppercase leading-none truncate">{title || "Untitled Masterpiece"}</h3>
+            </div>
+         </div>
 
         {/* Sliding Player centered with original aspect ratio */}
         <div 
@@ -577,7 +693,8 @@ export default forwardRef(function BeforeAfterPlayer({
         <div className="absolute bottom-8 text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em] z-20">
            Studio Viewport Focus Mode
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 

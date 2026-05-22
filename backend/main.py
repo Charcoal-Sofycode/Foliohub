@@ -243,17 +243,69 @@ def login_for_access_token(
 
     # 2FA CHECK
     if user.is_2fa_enabled:
-        return {"access_token": None, "token_type": "bearer", "requires_2fa": True}
+        trusted_device_token = request.cookies.get("trusted_device_token")
+        is_trusted = False
+        if trusted_device_token:
+            import hashlib
+            token_hash = hashlib.sha256(trusted_device_token.encode()).hexdigest()
+            device_record = db.query(models.TrustedDevice).filter(
+                models.TrustedDevice.user_id == user.id,
+                models.TrustedDevice.token_hash == token_hash
+            ).first()
+            if device_record:
+                now = datetime.now(timezone.utc)
+                expiry = device_record.expires_at
+                if expiry.tzinfo is None:
+                    expiry = expiry.replace(tzinfo=timezone.utc)
+                if expiry > now:
+                    is_trusted = True
+        
+        if not is_trusted:
+            return {"access_token": None, "token_type": "bearer", "requires_2fa": True}
 
 
     access_token = auth.create_access_token(data={"sub": user.email, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer", "requires_2fa": False}
 
 @app.post("/verify-2fa")
-def verify_2fa(data: schemas.TwoFactorVerify, db: Session = Depends(get_db)):
+def verify_2fa(
+    data: schemas.TwoFactorVerify, 
+    response: Response,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     user = db.query(models.User).filter(models.User.email == data.email).first()
     if not user or user.two_factor_code != data.code:
         raise HTTPException(status_code=400, detail="Invalid 2FA code")
+    
+    if data.trust_device:
+        import secrets
+        import hashlib
+        
+        token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        
+        user_agent = request.headers.get("user-agent", "Unknown Device")
+        ip_addr = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "Unknown IP")
+        
+        device_record = models.TrustedDevice(
+            user_id=user.id,
+            token_hash=token_hash,
+            device_name=user_agent[:255] if user_agent else None,
+            ip_address=ip_addr[:50] if ip_addr else None,
+            expires_at=datetime.now(timezone.utc) + timedelta(days=30)
+        )
+        db.add(device_record)
+        db.commit()
+        
+        response.set_cookie(
+            key="trusted_device_token",
+            value=token,
+            max_age=30 * 24 * 60 * 60,  # 30 days
+            httponly=True,
+            secure=True,
+            samesite="none"
+        )
     
     access_token = auth.create_access_token(data={"sub": user.email, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -838,6 +890,9 @@ def create_project_comment(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         
+    if project.portfolio.owner.subscription_tier != 'premium':
+        raise HTTPException(status_code=403, detail="Client Review Room is a Premium feature. The portfolio owner must upgrade their plan.")
+        
     new_comment = models.ProjectComment(
         project_id=project_id,
         timestamp=comment.timestamp,
@@ -855,6 +910,13 @@ def get_project_comments(
     db: Session = Depends(get_db)
 ):
     # Public route, anyone with the draft link can see comments
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    if project.portfolio.owner.subscription_tier != 'premium':
+        raise HTTPException(status_code=403, detail="Client Review Room is a Premium feature. The portfolio owner must upgrade their plan.")
+
     comments = db.query(models.ProjectComment).filter(models.ProjectComment.project_id == project_id).all()
     return comments
 
@@ -897,6 +959,9 @@ def get_my_reviews(
     if not portfolio:
         return []
     
+    if current_user.subscription_tier != 'premium':
+        return []
+    
     projects = db.query(models.Project).filter(models.Project.portfolio_id == portfolio.id).all()
     result = []
     for project in projects:
@@ -934,6 +999,9 @@ def update_project_status(
     project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+        
+    if project.portfolio.owner.subscription_tier != 'premium':
+        raise HTTPException(status_code=403, detail="Client Review Room is a Premium feature. The portfolio owner must upgrade their plan.")
     new_status = status_update.get("status")
     if new_status not in ["draft", "needs_revision", "approved", "published"]:
         raise HTTPException(status_code=400, detail="Invalid status")
