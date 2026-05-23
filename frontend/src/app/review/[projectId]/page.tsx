@@ -32,6 +32,46 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
   const canRequestChanges = project?.status !== 'approved' && remainingCorrections > 0 && (project?.status !== 'needs_revision' || allCommentsResolved);
   const canApprove = project?.status !== 'approved' && (project?.status !== 'needs_revision' || allCommentsResolved);
 
+  // Custom dialog popup state
+  const [customDialog, setCustomDialog] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm: () => void;
+    onCancel?: () => void;
+    isDestructive?: boolean;
+  } | null>(null);
+
+  const triggerConfirm = (message: string, onConfirm: () => void, onCancel?: () => void, isDestructive = false) => {
+    setCustomDialog({
+      isOpen: true,
+      type: 'confirm',
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setCustomDialog(null);
+      },
+      onCancel: () => {
+        if (onCancel) onCancel();
+        setCustomDialog(null);
+      },
+      isDestructive
+    });
+  };
+
+  const triggerAlert = (message: string, onConfirm?: () => void) => {
+    setCustomDialog({
+      isOpen: true,
+      type: 'alert',
+      message,
+      onConfirm: () => {
+        if (onConfirm) onConfirm();
+        setCustomDialog(null);
+      }
+    });
+  };
+
   // Long press for mobile
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
@@ -132,7 +172,7 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
 
   const submitComment = async () => {
     if (!newCommentText.trim() || !authorName.trim()) {
-      alert("Please enter your name and a comment.");
+      triggerAlert("Please enter your name and a comment.");
       return;
     }
     
@@ -152,20 +192,26 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
       fetchComments();
     } catch (err) {
       console.error(err);
-      alert("Failed to submit comment.");
+      triggerAlert("Failed to submit comment.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const deleteComment = async (commentId: number) => {
-    if (!confirm("Delete this comment?")) return;
-    try {
-      await fetch(`${API_URL}/comments/${commentId}`, { method: "DELETE" });
-      fetchComments();
-    } catch (err) {
-      console.error(err);
-    }
+  const deleteComment = (commentId: number) => {
+    triggerConfirm(
+      "Delete this comment?",
+      async () => {
+        try {
+          await fetch(`${API_URL}/comments/${commentId}`, { method: "DELETE" });
+          fetchComments();
+        } catch (err) {
+          console.error(err);
+        }
+      },
+      undefined,
+      true
+    );
   };
 
   const startEditing = (comment: any) => {
@@ -638,6 +684,56 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
           )}
         </div>
       </div>
+      {/* Custom Premium Theme Dialog Popup */}
+      <AnimatePresence>
+        {customDialog && customDialog.isOpen && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={customDialog.onCancel ? customDialog.onCancel : () => {}}
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.95, opacity: 0 }} 
+              className="relative bg-[#050505] border border-zinc-900 p-8 rounded-2xl max-w-sm w-full shadow-2xl font-sans text-left z-10"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1] animate-pulse" />
+                <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-zinc-500">System Notification</span>
+              </div>
+              <p className="text-sm font-light leading-relaxed text-zinc-300 mb-8">
+                {customDialog.message}
+              </p>
+              <div className="flex justify-end gap-3">
+                {customDialog.type === 'confirm' && (
+                  <button 
+                    type="button" 
+                    onClick={customDialog.onCancel}
+                    className="px-4 py-2 border border-zinc-900 rounded text-[10px] uppercase font-mono font-bold tracking-widest text-zinc-500 hover:text-white hover:bg-zinc-900 transition active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  onClick={customDialog.onConfirm}
+                  className={`px-4 py-2 rounded text-[10px] uppercase font-mono font-bold tracking-widest transition active:scale-95 shadow-md ${
+                    customDialog.isDestructive 
+                      ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/10' 
+                      : 'bg-white text-black hover:bg-zinc-200'
+                  }`}
+                >
+                  OK
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

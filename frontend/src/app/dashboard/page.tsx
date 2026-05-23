@@ -179,6 +179,46 @@ function DashboardContent() {
   const [totalCommentCount, setTotalCommentCount] = useState(0);
   const [selectedComments, setSelectedComments] = useState<number[]>([]);
 
+  // Custom dialog popup state
+  const [customDialog, setCustomDialog] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm: () => void;
+    onCancel?: () => void;
+    isDestructive?: boolean;
+  } | null>(null);
+
+  const triggerConfirm = (message: string, onConfirm: () => void, onCancel?: () => void, isDestructive = false) => {
+    setCustomDialog({
+      isOpen: true,
+      type: 'confirm',
+      message,
+      onConfirm: () => {
+        onConfirm();
+        setCustomDialog(null);
+      },
+      onCancel: () => {
+        if (onCancel) onCancel();
+        setCustomDialog(null);
+      },
+      isDestructive
+    });
+  };
+
+  const triggerAlert = (message: string, onConfirm?: () => void) => {
+    setCustomDialog({
+      isOpen: true,
+      type: 'alert',
+      message,
+      onConfirm: () => {
+        if (onConfirm) onConfirm();
+        setCustomDialog(null);
+      }
+    });
+  };
+
   // New: Payment status notification
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
@@ -482,19 +522,24 @@ function DashboardContent() {
     }
   };
 
-  const handleDeleteProject = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this masterpiece forever? This action cannot be undone.')) return;
-    
-    setIsDeletingId(id);
-    try {
-      await api.delete(`/projects/${id}`);
-      await fetchPortfolio();
-    } catch (err) {
-      console.error("Delete Error:", err);
-      alert("Failed to delete project.");
-    } finally {
-      setIsDeletingId(null);
-    }
+  const handleDeleteProject = (id: number) => {
+    triggerConfirm(
+      'Are you sure you want to delete this masterpiece forever? This action cannot be undone.',
+      async () => {
+        setIsDeletingId(id);
+        try {
+          await api.delete(`/projects/${id}`);
+          await fetchPortfolio();
+        } catch (err) {
+          console.error("Delete Error:", err);
+          triggerAlert("Failed to delete project.");
+        } finally {
+          setIsDeletingId(null);
+        }
+      },
+      undefined,
+      true
+    );
   };
 
   const handleUpdateEmail = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -709,7 +754,7 @@ function DashboardContent() {
       closeModal();
     } catch (err) {
       console.error("Update Error:", err);
-      alert("Failed to update metadata.");
+      triggerAlert("Failed to update metadata.");
     } finally {
       setIsUploading(false);
     }
@@ -828,10 +873,10 @@ function DashboardContent() {
       setCoverPreviewUrl(null);
       setCoverRemoved(false);
 
-      alert('Portfolio Updated!');
+      triggerAlert('Portfolio Updated!');
     } catch(err) {
       console.error(err);
-      alert('Failed to update portfolio');
+      triggerAlert('Failed to update portfolio');
     } finally {
       setSettingsLoading(false);
     }
@@ -842,39 +887,51 @@ function DashboardContent() {
     router.push('/login');
   };
 
-  const handleDowngrade = async () => {
-    const confirm = window.confirm("Are you sure you want to downgrade? Your premium features will be removed immediately. No refunds are provided for the remaining period.");
-    if (!confirm) return;
-
-    try {
-      await api.post('/downgrade');
-      await fetchPortfolio();
-      alert("Plan successfully downgraded to Free.");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to downgrade plan.");
-    }
+  const handleDowngrade = () => {
+    triggerConfirm(
+      "Are you sure you want to downgrade? Your premium features will be removed immediately. No refunds are provided for the remaining period.",
+      async () => {
+        try {
+          await api.post('/downgrade');
+          await fetchPortfolio();
+          triggerAlert("Plan successfully downgraded to Free.");
+        } catch (err) {
+          console.error(err);
+          triggerAlert("Failed to downgrade plan.");
+        }
+      }
+    );
   };
 
-  const handleDeleteInquiry = async (id: number) => {
-    if (!confirm("Remove this lead permanently? This cannot be undone.")) return;
-    try {
-      await api.delete(`/inquiries/${id}`);
-      fetchInquiries();
-    } catch (e) {
-      alert("Failed to delete inquiry.");
-    }
+  const handleDeleteInquiry = (id: number) => {
+    triggerConfirm(
+      "Remove this lead permanently? This cannot be undone.",
+      async () => {
+        try {
+          await api.delete(`/inquiries/${id}`);
+          fetchInquiries();
+        } catch (e) {
+          triggerAlert("Failed to delete inquiry.");
+        }
+      },
+      undefined,
+      true
+    );
   };
 
-  const handleReportInquiry = async (id: number) => {
-    if (!confirm("Report this lead as spam/unusual to the Sofycode Security Team?")) return;
-    try {
-      await api.post(`/inquiries/${id}/report`);
-      alert("Report submitted. Thank you for keeping Foliohub safe.");
-      fetchInquiries();
-    } catch (e) {
-      alert("Failed to submit report.");
-    }
+  const handleReportInquiry = (id: number) => {
+    triggerConfirm(
+      "Report this lead as spam/unusual to the Sofycode Security Team?",
+      async () => {
+        try {
+          await api.post(`/inquiries/${id}/report`);
+          triggerAlert("Report submitted. Thank you for keeping Foliohub safe.");
+          fetchInquiries();
+        } catch (e) {
+          triggerAlert("Failed to submit report.");
+        }
+      }
+    );
   };
 
   const copyToClipboard = (text: string) => {
@@ -1169,18 +1226,23 @@ function DashboardContent() {
                 )}
                 {activeTab === 'reviews' && reviewsData.length > 0 && (
                   <button 
-                    onClick={async () => {
-                      if (confirm("Are you sure you want to permanently clear all review histories across all projects? This cannot be undone.")) {
-                        try {
-                          await api.delete('/my-reviews/clear-all');
-                          fetchReviews();
-                          setSelectedComments([]);
-                          alert("All review histories cleared!");
-                        } catch (err) {
-                          console.error(err);
-                          alert("Failed to clear review history.");
-                        }
-                      }
+                    onClick={() => {
+                      triggerConfirm(
+                        "Are you sure you want to permanently clear all review histories across all projects? This cannot be undone.",
+                        async () => {
+                          try {
+                            await api.delete('/my-reviews/clear-all');
+                            fetchReviews();
+                            setSelectedComments([]);
+                            triggerAlert("All review histories cleared!");
+                          } catch (err) {
+                            console.error(err);
+                            triggerAlert("Failed to clear review history.");
+                          }
+                        },
+                        undefined,
+                        true
+                      );
                     }}
                     className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 border border-red-500/20 hover:border-red-500/50 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-bold uppercase tracking-widest text-[10px] rounded transition duration-200"
                   >
@@ -1415,7 +1477,7 @@ function DashboardContent() {
                                     e.stopPropagation();
                                     const reviewUrl = window.location.origin + `/review/${project.id}`;
                                     navigator.clipboard.writeText(reviewUrl);
-                                    alert("Client Review Link copied to clipboard!");
+                                    triggerAlert("Client Review Link copied to clipboard!");
                                   }}
                                   className="p-2 border border-zinc-900 rounded-lg bg-zinc-950/60 hover:bg-zinc-900 hover:border-zinc-800 hover:text-white transition-all text-zinc-400 flex items-center justify-center shrink-0"
                                   title="Copy Client Review Link"
@@ -1681,18 +1743,23 @@ function DashboardContent() {
                             
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={async () => {
-                                  if (confirm(`Clear all review history for "${projectReview.project_title}"?`)) {
-                                    try {
-                                      await api.delete(`/projects/${projectReview.project_id}/comments`);
-                                      fetchReviews();
-                                      setSelectedComments(selectedComments.filter(id => !projectReview.comments.some((c: any) => c.id === id)));
-                                      alert("Project review history cleared!");
-                                    } catch (err) {
-                                      console.error(err);
-                                      alert("Failed to clear project history.");
-                                    }
-                                  }
+                                onClick={() => {
+                                  triggerConfirm(
+                                    `Clear all review history for "${projectReview.project_title}"?`,
+                                    async () => {
+                                      try {
+                                        await api.delete(`/projects/${projectReview.project_id}/comments`);
+                                        fetchReviews();
+                                        setSelectedComments(selectedComments.filter(id => !projectReview.comments.some((c: any) => c.id === id)));
+                                        triggerAlert("Project review history cleared!");
+                                      } catch (err) {
+                                        console.error(err);
+                                        triggerAlert("Failed to clear project history.");
+                                      }
+                                    },
+                                    undefined,
+                                    true
+                                  );
                                 }}
                                 className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500/50 rounded transition text-red-400 flex items-center gap-2"
                                 title="Clear all comments and reset status"
@@ -1728,22 +1795,27 @@ function DashboardContent() {
                                     Cancel
                                   </button>
                                   <button
-                                    onClick={async () => {
-                                      if (confirm(`Delete ${projectSelectedIds.length} selected comments permanently?`)) {
-                                        try {
-                                          await api.post('/comments/bulk-delete', { comment_ids: projectSelectedIds });
-                                          setSelectedComments(selectedComments.filter(id => !projectSelectedIds.includes(id)));
-                                          fetchReviews();
-                                          alert("Selected comments deleted successfully!");
-                                        } catch (err) {
-                                          console.error(err);
-                                          alert("Failed to delete comments.");
-                                        }
-                                      }
+                                    onClick={() => {
+                                      triggerConfirm(
+                                        `Delete ${projectSelectedIds.length} selected comments permanently?`,
+                                        async () => {
+                                          try {
+                                            await api.post('/comments/bulk-delete', { comment_ids: projectSelectedIds });
+                                            setSelectedComments(selectedComments.filter(id => !projectSelectedIds.includes(id)));
+                                            fetchReviews();
+                                            triggerAlert("Selected comments deleted successfully!");
+                                          } catch (err) {
+                                            console.error(err);
+                                            triggerAlert("Failed to delete comments.");
+                                          }
+                                        },
+                                        undefined,
+                                        true
+                                      );
                                     }}
                                     className="text-[9px] font-mono bg-red-500/10 border border-red-500/30 hover:bg-red-500 hover:text-white transition text-red-400 px-3 py-1 rounded uppercase tracking-widest font-bold flex items-center gap-1.5"
                                   >
-                                    <Trash2 className="w-3 h-3" /> Delete Selected
+                                    <Trash2 className="w-3.5 h-3.5" /> Delete Selected
                                   </button>
                                 </div>
                               </div>
@@ -1807,11 +1879,16 @@ function DashboardContent() {
                                       {comment.is_resolved ? 'Reopen' : 'Resolve'}
                                     </button>
                                     <button 
-                                      onClick={async () => {
-                                        if (confirm("Permanently delete this comment?")) {
-                                          await api.delete(`/comments/${comment.id}`);
-                                          fetchReviews();
-                                        }
+                                      onClick={() => {
+                                        triggerConfirm(
+                                          "Permanently delete this comment?",
+                                          async () => {
+                                            await api.delete(`/comments/${comment.id}`);
+                                            fetchReviews();
+                                          },
+                                          undefined,
+                                          true
+                                        );
                                       }}
                                       className="p-1.5 rounded hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition"
                                       title="Delete Feedback"
@@ -3037,6 +3114,56 @@ function DashboardContent() {
              </motion.div>
           </div>
         )}
+        {/* Custom Premium Theme Dialog Popup */}
+        <AnimatePresence>
+          {customDialog && customDialog.isOpen && (
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                onClick={customDialog.onCancel ? customDialog.onCancel : () => {}}
+              />
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }} 
+                animate={{ scale: 1, opacity: 1 }} 
+                exit={{ scale: 0.95, opacity: 0 }} 
+                className="relative bg-[#050505] border border-zinc-900 p-8 rounded-2xl max-w-sm w-full shadow-2xl font-sans text-left z-10"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1] animate-pulse" />
+                  <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-zinc-500">System Notification</span>
+                </div>
+                <p className="text-sm font-light leading-relaxed text-zinc-300 mb-8">
+                  {customDialog.message}
+                </p>
+                <div className="flex justify-end gap-3">
+                  {customDialog.type === 'confirm' && (
+                    <button 
+                      type="button" 
+                      onClick={customDialog.onCancel}
+                      className="px-4 py-2 border border-zinc-900 rounded text-[10px] uppercase font-mono font-bold tracking-widest text-zinc-500 hover:text-white hover:bg-zinc-900 transition active:scale-95"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button 
+                    type="button" 
+                    onClick={customDialog.onConfirm}
+                    className={`px-4 py-2 rounded text-[10px] uppercase font-mono font-bold tracking-widest transition active:scale-95 shadow-md ${
+                      customDialog.isDestructive 
+                        ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/10' 
+                        : 'bg-white text-black hover:bg-zinc-200'
+                    }`}
+                  >
+                    OK
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </AnimatePresence>
     </main>
   );
