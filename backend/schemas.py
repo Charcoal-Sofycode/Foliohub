@@ -258,6 +258,8 @@ class ProjectUpdate(BaseModel):
     audio_mode: Optional[str] = None
     raw_hidden: Optional[bool] = None
     timeline_markers: Optional[List[dict]] = None
+    max_recorrections: Optional[int] = None
+    recorrections_used: Optional[int] = None
 
 class ProjectCommentCreate(BaseModel):
     timestamp: Optional[int] = None
@@ -275,6 +277,7 @@ class ProjectCommentResponse(BaseModel):
     text: str
     author_name: Optional[str] = None
     is_resolved: bool
+    is_draft: bool
     created_at: datetime
 
     class Config:
@@ -314,9 +317,18 @@ class ProjectResponse(BaseModel):
     audio_mode: Optional[str] = "crossfade"
     raw_hidden: Optional[bool] = False
     timeline_markers: Optional[List[dict]] = None
+    max_recorrections: int = 3
+    recorrections_used: int = 0
     created_at: datetime
     story: Optional[ProjectStoryResponse] = None
     comments: list["ProjectCommentResponse"] = []
+
+    @field_validator("comments", mode="after")
+    @classmethod
+    def filter_draft_comments(cls, v):
+        if not v:
+            return v
+        return [c for c in v if not c.is_draft]
 
 
 
@@ -374,6 +386,9 @@ class MatchResult(BaseModel):
     portfolio: PortfolioResponse
     match_score: int
     match_reason: str
+
+class BulkDeleteRequest(BaseModel):
+    comment_ids: list[int]
 
 # --- MULTIPART RESUMABLE UPLOADS ---
 

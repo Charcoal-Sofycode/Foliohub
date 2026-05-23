@@ -966,9 +966,10 @@ def get_my_reviews(
     result = []
     for project in projects:
         comments = db.query(models.ProjectComment).filter(
-            models.ProjectComment.project_id == project.id
+            models.ProjectComment.project_id == project.id,
+            models.ProjectComment.is_draft == False
         ).order_by(models.ProjectComment.created_at.desc()).all()
-        if comments:
+        if comments or project.status in ["needs_revision", "approved", "under_review", "review_needed"]:
             result.append({
                 "project_id": project.id,
                 "project_title": project.title,
@@ -989,6 +990,62 @@ def get_my_reviews(
             })
     return result
 
+@app.delete("/projects/{project_id}/comments")
+def clear_project_comments(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    project = _get_project_for_user(project_id, current_user, db)
+    db.query(models.ProjectComment).filter(models.ProjectComment.project_id == project_id).delete()
+    project.status = "published"
+    project.recorrections_used = 0
+    db.commit()
+    return {"message": "All project comments cleared successfully and status reset to published."}
+
+@app.delete("/my-reviews/clear-all")
+def clear_all_review_history(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    
+    projects = db.query(models.Project).filter(models.Project.portfolio_id == portfolio.id).all()
+    project_ids = [p.id for p in projects]
+    
+    db.query(models.ProjectComment).filter(models.ProjectComment.project_id.in_(project_ids)).delete(synchronize_session=False)
+    
+    for project in projects:
+        project.status = "published"
+        project.recorrections_used = 0
+        
+    db.commit()
+    return {"message": "All review histories cleared successfully across all projects."}
+
+@app.post("/comments/bulk-delete")
+def bulk_delete_comments(
+    req: schemas.BulkDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    portfolio = db.query(models.Portfolio).filter(models.Portfolio.user_id == current_user.id).first()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+        
+    projects = db.query(models.Project).filter(models.Project.portfolio_id == portfolio.id).all()
+    project_ids = {p.id for p in projects}
+    
+    comments = db.query(models.ProjectComment).filter(models.ProjectComment.id.in_(req.comment_ids)).all()
+    for comment in comments:
+        if comment.project_id not in project_ids:
+            raise HTTPException(status_code=403, detail="Access denied")
+            
+    db.query(models.ProjectComment).filter(models.ProjectComment.id.in_(req.comment_ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"message": "Selected comments deleted successfully."}
+
 # Public endpoint: client can approve or request changes from review page
 @app.put("/projects/{project_id}/status")
 def update_project_status(
@@ -1003,11 +1060,26 @@ def update_project_status(
     if project.portfolio.owner.subscription_tier != 'premium':
         raise HTTPException(status_code=403, detail="Client Review Room is a Premium feature. The portfolio owner must upgrade their plan.")
     new_status = status_update.get("status")
-    if new_status not in ["draft", "needs_revision", "approved", "published"]:
+    if new_status not in ["draft", "needs_revision", "approved", "published", "under_review", "review_needed"]:
         raise HTTPException(status_code=400, detail="Invalid status")
+        
+    if new_status == "needs_revision":
+        # Ensure we don't exceed the max recorrections limit
+        max_recs = project.max_recorrections if project.max_recorrections is not None else 3
+        used_recs = project.recorrections_used if project.recorrections_used is not None else 0
+        if used_recs >= max_recs:
+            raise HTTPException(status_code=400, detail="No remaining recorrections available according to the editor's recorrection policy.")
+        project.recorrections_used = used_recs + 1
+
+        # Publish all draft comments!
+        db.query(models.ProjectComment).filter(
+            models.ProjectComment.project_id == project_id,
+            models.ProjectComment.is_draft == True
+        ).update({"is_draft": False})
+
     project.status = new_status
     db.commit()
-    return {"message": f"Status updated to {new_status}", "status": new_status}
+    return {"message": f"Status updated to {new_status}", "status": new_status, "recorrections_used": project.recorrections_used}
 
 @app.get("/projects/{project_id}", response_model=schemas.ProjectResponse)
 def get_single_project(

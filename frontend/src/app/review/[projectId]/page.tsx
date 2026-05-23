@@ -19,6 +19,18 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const maxRecorrections = project?.max_recorrections ?? 3;
+  const recorrectionsUsed = project?.recorrections_used ?? 0;
+  const remainingCorrections = Math.max(0, maxRecorrections - recorrectionsUsed);
+
+  const hasComments = comments.length > 0;
+  const allCommentsResolved = hasComments && comments.every(c => c.is_resolved);
+
+  const isLocked = project?.status === 'approved' || (project?.status === 'needs_revision' && !allCommentsResolved) || (project?.status === 'needs_revision' && allCommentsResolved && remainingCorrections === 0);
+  
+  const canRequestChanges = project?.status !== 'approved' && remainingCorrections > 0 && (project?.status !== 'needs_revision' || allCommentsResolved);
+  const canApprove = project?.status !== 'approved' && (project?.status !== 'needs_revision' || allCommentsResolved);
 
   // Long press for mobile
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
@@ -92,7 +104,7 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!project || project.status === 'approved') return;
+    if (!project || isLocked) return;
     
     videoRef.current?.pause();
     setIsCommenting(true);
@@ -103,7 +115,7 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
       isLongPress.current = false;
       longPressTimer.current = setTimeout(() => {
         isLongPress.current = true;
-        if (project && project.status !== 'approved') {
+        if (project && !isLocked) {
           videoRef.current?.pause();
           setIsCommenting(true);
         }
@@ -262,7 +274,14 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
         {/* Main Video Area */}
         <div className="flex-1 relative bg-black flex flex-col items-center justify-center p-4 lg:p-8 overflow-y-auto">
           <div className="w-full max-w-5xl relative group">
-            <div className="relative w-fit mx-auto bg-black rounded-lg overflow-hidden group shadow-2xl flex items-center justify-center min-h-[400px] min-w-[300px]">
+            <div 
+              className="relative w-full mx-auto bg-black rounded-lg overflow-hidden group shadow-2xl flex items-center justify-center"
+              style={{
+                aspectRatio: aspectRatio ? aspectRatio : 1.777,
+                maxHeight: '82vh',
+                maxWidth: aspectRatio ? `min(calc(82vh * ${aspectRatio}), 100%)` : 'none'
+              }}
+            >
               {project.raw_media_url ? (
                 <BeforeAfterPlayer 
                   ref={playerRef}
@@ -271,7 +290,12 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
                   title={project.title}
                   videoRef={videoRef}
                   onTimeUpdate={setCurrentTime}
-                  onDurationChange={setDuration}
+                  onDurationChange={(d) => {
+                    setDuration(d);
+                    if (videoRef.current) {
+                      setAspectRatio(videoRef.current.videoWidth / videoRef.current.videoHeight);
+                    }
+                  }}
                   onVideoClick={handleVideoClick}
                   onContextMenu={handleContextMenu}
                   onPointerDown={handlePointerDown}
@@ -288,9 +312,13 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
                   <video
                     ref={videoRef}
                     src={project.media_url}
-                    className="w-full h-full"
+                    className="w-full h-full object-contain"
                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                    onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+                    onLoadedMetadata={(e) => {
+                      const video = e.currentTarget;
+                      setDuration(video.duration);
+                      setAspectRatio(video.videoWidth / video.videoHeight);
+                    }}
                     onClick={handleVideoClick}
                   />
 
@@ -301,7 +329,7 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
                     onPointerDown={handlePointerDown}
                     onPointerUp={handlePointerUp}
                     onPointerLeave={handlePointerUp}
-                    className="absolute inset-0 z-10 cursor-crosshair select-none"
+                    className={`absolute inset-0 z-10 select-none ${isLocked ? 'cursor-pointer' : 'cursor-crosshair'}`}
                   />
                 </>
               )}
@@ -436,6 +464,24 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
              <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider">
                Left-click or tap to play/pause. Right-click or long-press to add comment.
              </p>
+
+             {/* Recorrection Policy Visual Metrics */}
+             <div className="mt-4 grid grid-cols-2 gap-3">
+               <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-lg p-3 flex flex-col justify-between hover:border-zinc-700/50 transition">
+                 <span className="text-[8px] text-zinc-500 font-mono uppercase tracking-widest">Allowed Rounds</span>
+                 <span className="text-lg font-bold tracking-tight text-white mt-1">{maxRecorrections}</span>
+               </div>
+               <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-lg p-3 flex flex-col justify-between hover:border-zinc-700/50 transition">
+                 <span className="text-[8px] text-zinc-500 font-mono uppercase tracking-widest">Remaining Rounds</span>
+                 <span className={`text-lg font-bold tracking-tight mt-1 ${remainingCorrections > 0 ? 'text-amber-400' : 'text-zinc-600'}`}>{remainingCorrections}</span>
+               </div>
+             </div>
+
+             {project?.status === 'needs_revision' && allCommentsResolved && remainingCorrections === 0 && (
+               <div className="mt-3 p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg text-[9px] text-amber-500/80 uppercase tracking-wider font-mono">
+                 ⚠️ Correction limit reached. You can only Approve this version.
+               </div>
+             )}
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -455,7 +501,9 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
                    className={`bg-[#111] border p-4 rounded-lg group transition ${
                      comment.is_resolved 
                        ? 'border-zinc-900/50 opacity-50' 
-                       : 'border-zinc-800 hover:border-zinc-700'
+                       : comment.is_draft
+                         ? 'border-dashed border-[#818cf8]/40 shadow-[0_0_15px_rgba(129,140,248,0.03)]'
+                         : 'border-zinc-800 hover:border-zinc-700'
                    }`}
                  >
                    <div className="flex justify-between items-start mb-2">
@@ -467,41 +515,48 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
                        >
                          <PlayCircle className="w-3 h-3" /> {formatTime(comment.timestamp)}
                        </span>
+                       {comment.is_draft && (
+                         <span className="text-[8px] uppercase tracking-widest font-black bg-[#818cf8]/15 text-[#818cf8] px-1.5 py-0.5 rounded flex items-center gap-1 border border-[#818cf8]/25 animate-pulse">
+                           Draft
+                         </span>
+                       )}
                        {comment.is_resolved && (
                          <span className="text-[8px] uppercase tracking-widest font-black bg-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded flex items-center gap-1">
                            <Check className="w-2.5 h-2.5" /> Resolved
                          </span>
                        )}
                        {/* Edit / Delete actions */}
-                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                         {editingCommentId === comment.id ? (
+                       {!isLocked && !comment.is_resolved && (
+                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                           {editingCommentId === comment.id ? (
+                             <button
+                               onClick={() => saveEdit(comment.id)}
+                               className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 transition"
+                               title="Save"
+                             >
+                               <Check className="w-3 h-3" />
+                             </button>
+                           ) : (
+                             <button
+                               onClick={() => startEditing(comment)}
+                               className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition"
+                               title="Edit"
+                             >
+                               <Pencil className="w-3 h-3" />
+                             </button>
+                           )}
                            <button
-                             onClick={() => saveEdit(comment.id)}
-                             className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 transition"
-                             title="Save"
+                             onClick={() => deleteComment(comment.id)}
+                             className="p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition"
+                             title="Delete"
                            >
-                             <Check className="w-3 h-3" />
+                             <Trash2 className="w-3 h-3" />
                            </button>
-                         ) : (
-                           <button
-                             onClick={() => startEditing(comment)}
-                             className="p-1 rounded hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 transition"
-                             title="Edit"
-                           >
-                             <Pencil className="w-3 h-3" />
-                           </button>
-                         )}
-                         <button
-                           onClick={() => deleteComment(comment.id)}
-                           className="p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition"
-                           title="Delete"
-                         >
-                           <Trash2 className="w-3 h-3" />
-                         </button>
-                       </div>
+                         </div>
+                       )}
                      </div>
                    </div>
-                   {editingCommentId === comment.id ? (
+                   {editingCommentId === comment.id && !isLocked ? (
                      <textarea
                        className="w-full bg-black border border-zinc-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-zinc-500 resize-none h-16"
                        value={editingText}
@@ -561,20 +616,24 @@ export default function ReviewPage({ params }: { params: Promise<{ projectId: st
           </div>
 
           {/* Client Action Buttons */}
-          {project.status !== 'approved' && (
+          {(canApprove || canRequestChanges) && (
             <div className="p-4 border-t border-zinc-900 flex gap-3">
-              <button
-                onClick={() => updateStatus('approved')}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition"
-              >
-                <ThumbsUp className="w-4 h-4" /> Approve
-              </button>
-              <button
-                onClick={() => updateStatus('needs_revision')}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-500/20 transition"
-              >
-                <ThumbsDown className="w-4 h-4" /> Request Changes
-              </button>
+              {canApprove && (
+                <button
+                  onClick={() => updateStatus('approved')}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition"
+                >
+                  <ThumbsUp className="w-4 h-4" /> Approve
+                </button>
+              )}
+              {canRequestChanges && (
+                <button
+                  onClick={() => updateStatus('needs_revision')}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-500/20 transition"
+                >
+                  <ThumbsDown className="w-4 h-4" /> Request Changes
+                </button>
+              )}
             </div>
           )}
         </div>

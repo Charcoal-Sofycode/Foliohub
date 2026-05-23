@@ -104,6 +104,8 @@ class Project(Base):
     # AI Tagging and Client Review
     tags = Column(String, nullable=True) # Comma-separated AI generated tags
     status = Column(String, default="published") # "draft", "published", "needs_revision", "approved"
+    max_recorrections = Column(Integer, default=3)
+    recorrections_used = Column(Integer, default=0)
     
     # Proof of Work System
     timeline_breakdown = Column(Text, nullable=True)
@@ -206,6 +208,7 @@ class ProjectComment(Base):
     text = Column(Text, nullable=False)
     author_name = Column(String, nullable=True)
     is_resolved = Column(Boolean, default=False)
+    is_draft = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     project = relationship("Project", back_populates="comments")

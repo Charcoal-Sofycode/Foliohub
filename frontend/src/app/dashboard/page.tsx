@@ -177,6 +177,7 @@ function DashboardContent() {
   const [reviewsData, setReviewsData] = useState<any[]>([]);
   const [isReviewsLoading, setIsReviewsLoading] = useState(false);
   const [totalCommentCount, setTotalCommentCount] = useState(0);
+  const [selectedComments, setSelectedComments] = useState<number[]>([]);
 
   // New: Payment status notification
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
@@ -1166,6 +1167,26 @@ function DashboardContent() {
                     <Plus className="w-4 h-4" /> Ingest Media
                   </button>
                 )}
+                {activeTab === 'reviews' && reviewsData.length > 0 && (
+                  <button 
+                    onClick={async () => {
+                      if (confirm("Are you sure you want to permanently clear all review histories across all projects? This cannot be undone.")) {
+                        try {
+                          await api.delete('/my-reviews/clear-all');
+                          fetchReviews();
+                          setSelectedComments([]);
+                          alert("All review histories cleared!");
+                        } catch (err) {
+                          console.error(err);
+                          alert("Failed to clear review history.");
+                        }
+                      }
+                    }}
+                    className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 border border-red-500/20 hover:border-red-500/50 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-bold uppercase tracking-widest text-[10px] rounded transition duration-200"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Clear All History
+                  </button>
+                )}
               </header>
 
               {activeTab === 'projects' && (
@@ -1601,109 +1622,261 @@ function DashboardContent() {
                       </p>
                     </div>
                   ) : (
-                    reviewsData.map((projectReview: any, pi: number) => (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: pi * 0.1 }}
-                        key={projectReview.project_id}
-                        className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden"
-                      >
-                        {/* Project Header */}
-                        <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
-                              <Play className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-white text-sm tracking-tight">{projectReview.project_title}</h4>
-                              <div className="flex items-center gap-3 mt-1">
-                                <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                                  projectReview.project_status === 'approved'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                    : projectReview.project_status === 'needs_revision'
-                                    ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                }`}>
-                                  {projectReview.project_status === 'approved' ? '✓ Approved' : projectReview.project_status === 'needs_revision' ? '⚠ Changes Requested' : '● In Review'}
-                                </span>
-                                <span className="text-[10px] font-mono text-zinc-600">
-                                  {projectReview.comments.filter((c:any) => !c.is_resolved).length} active review{projectReview.comments.filter((c:any) => !c.is_resolved).length !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              const url = window.location.origin + `/review/${projectReview.project_id}`;
-                              window.open(url, '_blank');
-                            }}
-                            className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center gap-2"
-                          >
-                            <ExternalLink className="w-3 h-3" /> Open Review
-                          </button>
-                        </div>
-
-                        {/* Comments List */}
-                        <div className="divide-y divide-zinc-900/50">
-                          {projectReview.comments.map((comment: any) => (
-                            <div key={comment.id} className="p-5 px-6 flex items-start gap-4 hover:bg-zinc-900/30 transition group">
-                              <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <span className="text-[10px] font-bold text-zinc-400 uppercase">
-                                  {comment.author_name?.charAt(0) || '?'}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-3 mb-1">
-                                  <span className="text-xs font-bold text-white">{comment.author_name}</span>
-                                  {comment.timestamp != null && (
-                                    <span className="text-[10px] font-mono bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded flex items-center gap-1">
-                                      <Clock className="w-3 h-3" /> {(() => { const m = Math.floor(comment.timestamp / 60); const s = comment.timestamp % 60; return `${m}:${String(s).padStart(2, '0')}`; })()}
-                                    </span>
-                                  )}
-                                  <span className="text-[10px] font-mono text-zinc-700">
-                                    {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-zinc-300 font-light leading-relaxed">{comment.text}</p>
-                              </div>
-
-                              <div className="flex items-center gap-2 transition-opacity">
-                                {comment.is_resolved && (
-                                  <span className="text-[9px] font-black uppercase tracking-tighter text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 mr-2">
-                                    Resolved
-                                  </span>
-                                )}
-                                <button 
-                                  onClick={async () => {
-                                    await api.put(`/comments/${comment.id}`, { is_resolved: !comment.is_resolved });
-                                    fetchReviews();
-                                  }}
-                                  className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-2 ${
-                                    comment.is_resolved 
-                                      ? 'bg-zinc-800 text-zinc-500 hover:text-white' 
-                                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
-                                  }`}
-                                >
-                                  {comment.is_resolved ? 'Reopen' : 'Resolve'}
-                                </button>
-                                <button 
-                                  onClick={async () => {
-                                    if (confirm("Permanently delete this comment?")) {
-                                      await api.delete(`/comments/${comment.id}`);
-                                      fetchReviews();
+                    reviewsData.map((projectReview: any, pi: number) => {
+                      const projectSelectedIds = selectedComments.filter(id => projectReview.comments.some((c: any) => c.id === id));
+                      const projectCommentIds = projectReview.comments.map((c: any) => c.id);
+                      const allCommentsOfProjectSelected = projectCommentIds.length > 0 && projectCommentIds.every((id: number) => selectedComments.includes(id));
+                      const someCommentsOfProjectSelected = projectCommentIds.some((id: number) => selectedComments.includes(id)) && !allCommentsOfProjectSelected;
+                      return (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: pi * 0.1 }}
+                          key={projectReview.project_id}
+                          className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden animate-fadeIn"
+                        >
+                          {/* Project Header */}
+                          <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              {projectReview.comments.length > 0 && (
+                                <input 
+                                  type="checkbox"
+                                  checked={allCommentsOfProjectSelected}
+                                  ref={(el) => {
+                                    if (el) {
+                                      el.indeterminate = someCommentsOfProjectSelected;
                                     }
                                   }}
-                                  className="p-1.5 rounded hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition"
-                                  title="Delete Feedback"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      const toAdd = projectCommentIds.filter((id: number) => !selectedComments.includes(id));
+                                      setSelectedComments([...selectedComments, ...toAdd]);
+                                    } else {
+                                      setSelectedComments(selectedComments.filter(id => !projectCommentIds.includes(id)));
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-[#6366f1] focus:ring-0 cursor-pointer mr-1"
+                                  title="Select all comments in this project"
+                                />
+                              )}
+                              <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                <Play className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-white text-sm tracking-tight">{projectReview.project_title}</h4>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                                    projectReview.project_status === 'approved'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                      : projectReview.project_status === 'needs_revision'
+                                      ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                  }`}>
+                                    {projectReview.project_status === 'approved' ? '✓ Approved' : projectReview.project_status === 'needs_revision' ? '⚠ Changes Requested' : '● In Review'}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-zinc-600">
+                                    {projectReview.comments.filter((c:any) => !c.is_resolved).length} active review{projectReview.comments.filter((c:any) => !c.is_resolved).length !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          ))}
+                            
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={async () => {
+                                  if (confirm(`Clear all review history for "${projectReview.project_title}"?`)) {
+                                    try {
+                                      await api.delete(`/projects/${projectReview.project_id}/comments`);
+                                      fetchReviews();
+                                      setSelectedComments(selectedComments.filter(id => !projectReview.comments.some((c: any) => c.id === id)));
+                                      alert("Project review history cleared!");
+                                    } catch (err) {
+                                      console.error(err);
+                                      alert("Failed to clear project history.");
+                                    }
+                                  }
+                                }}
+                                className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500/50 rounded transition text-red-400 flex items-center gap-2"
+                                title="Clear all comments and reset status"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Clear History
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const url = window.location.origin + `/review/${projectReview.project_id}`;
+                                  window.open(url, '_blank');
+                                }}
+                                className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center gap-2"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Open Review
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Comments List */}
+                          <div className="divide-y divide-zinc-900/50">
+                            {projectSelectedIds.length > 0 && (
+                              <div className="p-4 px-6 bg-red-500/5 border-b border-zinc-900 flex items-center justify-between animate-fadeIn">
+                                <span className="text-[10px] font-mono text-red-400 uppercase tracking-wider font-bold">
+                                  {projectSelectedIds.length} Comment{projectSelectedIds.length !== 1 ? 's' : ''} Selected
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedComments(selectedComments.filter(id => !projectSelectedIds.includes(id)));
+                                    }}
+                                    className="text-[9px] font-mono text-zinc-500 hover:text-white uppercase tracking-widest font-bold px-2 py-1 transition"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm(`Delete ${projectSelectedIds.length} selected comments permanently?`)) {
+                                        try {
+                                          await api.post('/comments/bulk-delete', { comment_ids: projectSelectedIds });
+                                          setSelectedComments(selectedComments.filter(id => !projectSelectedIds.includes(id)));
+                                          fetchReviews();
+                                          alert("Selected comments deleted successfully!");
+                                        } catch (err) {
+                                          console.error(err);
+                                          alert("Failed to delete comments.");
+                                        }
+                                      }
+                                    }}
+                                    className="text-[9px] font-mono bg-red-500/10 border border-red-500/30 hover:bg-red-500 hover:text-white transition text-red-400 px-3 py-1 rounded uppercase tracking-widest font-bold flex items-center gap-1.5"
+                                  >
+                                    <Trash2 className="w-3 h-3" /> Delete Selected
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {projectReview.comments.map((comment: any) => {
+                              const isChecked = selectedComments.includes(comment.id);
+                              return (
+                                <div key={comment.id} className="p-5 px-6 flex items-start gap-4 hover:bg-zinc-900/30 transition group">
+                                  <div className="flex items-center mt-1 mr-1 shrink-0">
+                                    <input 
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedComments([...selectedComments, comment.id]);
+                                        } else {
+                                          setSelectedComments(selectedComments.filter(id => id !== comment.id));
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-[#6366f1] focus:ring-0 cursor-pointer"
+                                    />
+                                  </div>
+                                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    <span className="text-[10px] font-bold text-zinc-400 uppercase">
+                                      {comment.author_name?.charAt(0) || '?'}
+                                    </span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 mb-1">
+                                      <span className="text-xs font-bold text-white">{comment.author_name}</span>
+                                      {comment.timestamp != null && (
+                                        <span className="text-[10px] font-mono bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded flex items-center gap-1">
+                                          <Clock className="w-3 h-3" /> {(() => { const m = Math.floor(comment.timestamp / 60); const s = comment.timestamp % 60; return `${m}:${String(s).padStart(2, '0')}`; })()}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] font-mono text-zinc-700">
+                                        {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-zinc-300 font-light leading-relaxed">{comment.text}</p>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 transition-opacity">
+                                    {comment.is_resolved && (
+                                      <span className="text-[9px] font-black uppercase tracking-tighter text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 mr-2">
+                                        Resolved
+                                      </span>
+                                    )}
+                                    <button 
+                                      onClick={async () => {
+                                        await api.put(`/comments/${comment.id}`, { is_resolved: !comment.is_resolved });
+                                        fetchReviews();
+                                      }}
+                                      className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-2 ${
+                                        comment.is_resolved 
+                                          ? 'bg-zinc-800 text-zinc-500 hover:text-white' 
+                                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                                      }`}
+                                    >
+                                      {comment.is_resolved ? 'Reopen' : 'Resolve'}
+                                    </button>
+                                    <button 
+                                      onClick={async () => {
+                                        if (confirm("Permanently delete this comment?")) {
+                                          await api.delete(`/comments/${comment.id}`);
+                                          fetchReviews();
+                                        }
+                                      }}
+                                      className="p-1.5 rounded hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition"
+                                      title="Delete Feedback"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      );
+                    })
+                  )}
+
+                  {/* Global Floating Bulk Actions Bar */}
+                  <AnimatePresence>
+                    {selectedComments.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 50, scale: 0.95 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-black/80 backdrop-blur-xl border border-zinc-800 p-4 px-6 rounded-full shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex items-center gap-6"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
+                          <span className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-widest">
+                            {selectedComments.length} Selected
+                          </span>
+                        </div>
+                        
+                        <div className="h-4 w-px bg-zinc-800" />
+                        
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedComments([])}
+                            className="text-[10px] font-mono text-zinc-500 hover:text-white uppercase tracking-widest font-bold px-3 py-2 transition"
+                          >
+                            Clear
+                          </button>
+                          
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Delete all ${selectedComments.length} selected comments permanently?`)) {
+                                try {
+                                  await api.post('/comments/bulk-delete', { comment_ids: selectedComments });
+                                  setSelectedComments([]);
+                                  fetchReviews();
+                                  alert("Selected comments deleted successfully!");
+                                } catch (err) {
+                                  console.error(err);
+                                  alert("Failed to delete comments.");
+                                }
+                              }
+                            }}
+                            className="bg-red-500 hover:bg-red-600 text-white text-[10px] font-mono font-bold uppercase tracking-widest px-4 py-2 rounded-full transition flex items-center gap-2 shadow-lg shadow-red-500/20"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Delete
+                          </button>
                         </div>
                       </motion.div>
-                    ))
-                  )}
+                    )}
+                  </AnimatePresence>
                 </motion.div>
                 )
               )}
@@ -2383,6 +2556,7 @@ function DashboardContent() {
                       disabled={isUploading}
                     >
                       <option value="draft" className="bg-black text-amber-500">Draft (Client Review)</option>
+                      <option value="review_needed" className="bg-black text-amber-400">Under Review</option>
                       <option value="needs_revision" className="bg-black text-red-500">Needs Revision</option>
                       <option value="approved" className="bg-black text-emerald-500">Approved</option>
                       <option value="published" className="bg-black text-white">Published</option>
@@ -2444,78 +2618,7 @@ function DashboardContent() {
                   </div>
                 </div>
                 <div className="pt-6 border-t border-zinc-900 space-y-6">
-                   <div className="space-y-4">
-                     <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400 flex items-center gap-2">
-                       <Activity className="w-4 h-4 text-emerald-500" /> Hybrid Analytics Engine
-                     </label>
-                     <p className="text-[10px] text-zinc-500 font-light mb-4">
-                        Auto-import public data from a link, then manually add hidden metrics and strategy notes.
-                     </p>
-                     
-                     <div className="flex gap-2">
-                       <input 
-                          type="text" 
-                          className="flex-1 bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" 
-                          placeholder="Paste YouTube, TikTok, or Instagram link..." 
-                          value={sourceLink} 
-                          onChange={(e) => setSourceLink(e.target.value)} 
-                          disabled={isUploading} 
-                       />
-                       <button 
-                         type="button" 
-                         className="px-4 py-2 bg-zinc-800 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-700 transition shrink-0" 
-                         disabled={isUploading || isSyncing} 
-                         onClick={handleAutoSync}
-                       >
-                         {isSyncing ? "Syncing..." : "Auto-Sync"}
-                       </button>
-                     </div>
 
-                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                       <div className="space-y-1">
-                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Views</label>
-                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricViews} onChange={(e) => setMetricViews(e.target.value)} disabled={isUploading} placeholder="e.g. 5.2M" />
-                       </div>
-                       <div className="space-y-1">
-                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Likes</label>
-                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricLikes} onChange={(e) => setMetricLikes(e.target.value)} disabled={isUploading} placeholder="e.g. 100K" />
-                       </div>
-                       <div className="space-y-1">
-                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Comments</label>
-                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricComments} onChange={(e) => setMetricComments(e.target.value)} disabled={isUploading} placeholder="e.g. 5K" />
-                       </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                       <div className="space-y-1">
-                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-emerald-500">Retention (Hidden)</label>
-                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricRetention} onChange={(e) => setMetricRetention(e.target.value)} disabled={isUploading} placeholder="e.g. 78%" />
-                       </div>
-                       <div className="space-y-1">
-                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-emerald-500">CTR (Hidden)</label>
-                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricCtr} onChange={(e) => setMetricCtr(e.target.value)} disabled={isUploading} placeholder="e.g. 12.4%" />
-                       </div>
-                       <div className="space-y-1">
-                         <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-emerald-500">Watch Time (Hidden)</label>
-                         <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={metricWatchTime} onChange={(e) => setMetricWatchTime(e.target.value)} disabled={isUploading} placeholder="e.g. 100K Hrs" />
-                       </div>
-                     </div>
-
-                     <div className="space-y-4 pt-4 border-t border-zinc-900">
-                        <div>
-                          <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Client Goals</label>
-                          <textarea className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700 h-16 resize-none" value={clientGoals} onChange={(e) => setClientGoals(e.target.value)} disabled={isUploading} placeholder="e.g. Increase male demographic 18-24 by 20%" />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Strategy Notes</label>
-                          <textarea className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700 h-16 resize-none" value={strategyNotes} onChange={(e) => setStrategyNotes(e.target.value)} disabled={isUploading} placeholder="e.g. Used fast-paced J-cuts in the first 3 seconds to hook viewers..." />
-                        </div>
-                        <div>
-                          <label className="text-[10px] uppercase tracking-[0.2em] font-medium text-zinc-500">Monetization Results</label>
-                          <input type="text" className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm outline-none transition-colors text-white placeholder-zinc-700" value={monetizationResults} onChange={(e) => setMonetizationResults(e.target.value)} disabled={isUploading} placeholder="e.g. Generated $15,000 in sponsor sales" />
-                        </div>
-                     </div>
-                   </div>
 
                    <div>
                      <label className="text-xs uppercase tracking-[0.2em] font-medium text-zinc-400">Proof of Work: Timeline Breakdown (Optional)</label>
