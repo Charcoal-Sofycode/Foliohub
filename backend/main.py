@@ -963,12 +963,23 @@ def get_my_reviews(
         return []
     
     projects = db.query(models.Project).filter(models.Project.portfolio_id == portfolio.id).all()
+    if not projects:
+        return []
+
+    project_ids = [p.id for p in projects]
+    all_comments = db.query(models.ProjectComment).filter(
+        models.ProjectComment.project_id.in_(project_ids),
+        models.ProjectComment.is_draft == False
+    ).order_by(models.ProjectComment.created_at.desc()).all()
+
+    # Map comments to their respective projects in memory to avoid N+1 query loops
+    comments_by_project = {}
+    for c in all_comments:
+        comments_by_project.setdefault(c.project_id, []).append(c)
+
     result = []
     for project in projects:
-        comments = db.query(models.ProjectComment).filter(
-            models.ProjectComment.project_id == project.id,
-            models.ProjectComment.is_draft == False
-        ).order_by(models.ProjectComment.created_at.desc()).all()
+        comments = comments_by_project.get(project.id, [])
         if comments or project.status in ["needs_revision", "approved", "under_review", "review_needed"]:
             result.append({
                 "project_id": project.id,

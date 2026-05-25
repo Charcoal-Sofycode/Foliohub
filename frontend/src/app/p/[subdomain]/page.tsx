@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { motion } from 'framer-motion';
 import PortfolioPlayer from '@/components/PortfolioPlayer';
 import BeforeAfterPlayer from '@/components/BeforeAfterPlayer';
-import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download, MessageCircle, Mail, Briefcase, Activity, Search } from 'lucide-react';
+import { MapPin, CalendarClock, Send, Play, Camera, CheckCircle2, Download, MessageCircle, Mail, Briefcase, Activity, Search, AlertCircle } from 'lucide-react';
 import FolioLogo from '@/components/FolioLogo';
 import ProjectStoryTimeline from '@/components/ProjectStoryTimeline';
 import StyleFingerprint from '@/components/StyleFingerprint';
@@ -16,6 +16,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
   const [projectSearch, setProjectSearch] = useState('');
+  const [dialogConfig, setDialogConfig] = useState<{isOpen: boolean, message: string, isError?: boolean}>({isOpen: false, message: ''});
 
   useEffect(() => {
     fetch(`${API_URL}/portfolios/view/${resolvedParams.subdomain}`)
@@ -67,8 +68,35 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
 
   const skillsList = portfolio.skills ? portfolio.skills.split(',').map((s: string) => s.trim()) : [];
 
-  const fontClass = 'font-sans';
-  const accentColor = '#ffffff';
+  const theme = portfolio.theme_config || {};
+  
+  const fontMapping: Record<string, string> = {
+    inter: 'font-sans',
+    playfair: 'font-serif',
+    space: 'font-mono',
+    outfit: 'font-sans'
+  };
+  const fontClass = fontMapping[theme.primary_font || 'inter'] || 'font-sans';
+  const accentColor = portfolio.accent_color || '#ffffff';
+  
+  const layoutMode = theme.layout_mode || 'classic';
+  const buttonStyle = theme.button_style || 'solid';
+  const elementScale = theme.element_scale || 'md';
+
+  const btnBaseClass = 'uppercase font-bold tracking-[0.2em] transition text-center flex items-center justify-center gap-2';
+  const scaleMapping: Record<string, string> = {
+    sm: 'text-[9px] px-4 py-2 rounded-sm',
+    md: 'text-[10px] px-6 py-3 rounded-md',
+    lg: 'text-xs px-8 py-4 rounded-lg'
+  };
+  const btnSizeClass = scaleMapping[elementScale] || scaleMapping['md'];
+
+  const btnPrimaryClass = buttonStyle === 'outline' 
+    ? `border border-white text-white hover:bg-white hover:text-black ${btnBaseClass} ${btnSizeClass}`
+    : buttonStyle === 'glass'
+    ? `bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 ${btnBaseClass} ${btnSizeClass}`
+    : `bg-white text-black hover:bg-zinc-200 ${btnBaseClass} ${btnSizeClass}`; 
+
   const introInitial = { opacity: 0, y: 20 };
   const introAnimate = { opacity: 1, y: 0 };
 
@@ -90,20 +118,20 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
          </div>
          <div className="flex items-center gap-2 sm:gap-6 pointer-events-auto">
             {portfolio.booking_link && (
-               <a href={portfolio.booking_link} target="_blank" rel="noopener noreferrer" className="hidden sm:inline-flex px-4 sm:px-6 py-2 border border-white text-[10px] uppercase font-bold tracking-[0.2em] hover:bg-white hover:text-black transition">
+               <a href={portfolio.booking_link} target="_blank" rel="noopener noreferrer" className={`hidden sm:inline-flex ${btnPrimaryClass}`}>
                  Book Now
                </a>
             )}
-            <a href="#contact" className="px-4 sm:px-6 py-2 text-black text-[10px] uppercase font-bold tracking-[0.2em] hover:opacity-80 transition" style={{ backgroundColor: accentColor }}>
+            <a href="#contact" className={btnPrimaryClass} style={buttonStyle === 'solid' ? { backgroundColor: accentColor } : {}}>
               Hire Me
             </a>
          </div>
       </nav>
 
       {/* Hero / Showreel */}
-      <header className={`${hasHeaderBackground ? 'h-[90vh]' : 'min-h-[50vh] sm:min-h-[60vh]'} relative pt-24 sm:pt-32 px-4 sm:px-6 lg:px-12 flex flex-col justify-end pb-8 sm:pb-12`}>
+      <header className={`${hasHeaderBackground ? 'h-[90vh]' : 'min-h-[50vh] sm:min-h-[60vh]'} relative pt-24 sm:pt-32 px-4 sm:px-6 lg:px-12 flex ${layoutMode === 'minimal' ? 'flex-col justify-center items-center text-center' : 'flex-col justify-end'} pb-8 sm:pb-12`}>
          {portfolio.showreel_url ? (
-            <div className="absolute inset-0 z-0">
+            <div className={`absolute inset-0 z-0 ${layoutMode === 'split' ? 'md:left-1/2 md:w-1/2' : ''}`}>
                {/* Embed youtube or video. If it's a raw video url: */}
                {portfolio.showreel_url.endsWith('.mp4') || portfolio.showreel_url.endsWith('.webm') ? (
                   <video 
@@ -119,20 +147,20 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                     <p className="text-zinc-600 font-mono text-xs uppercase tracking-widest">Showreel Connected: {portfolio.showreel_url}</p>
                   </div>
                )}
-               <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent" />
+               <div className={`absolute inset-0 bg-gradient-to-t from-[#050505] ${layoutMode === 'split' ? 'md:bg-gradient-to-r md:from-[#050505] md:via-[#050505]/50' : 'via-transparent'} to-transparent`} />
             </div>
          ) : portfolio.cover_image_url ? (
-            <div className="absolute inset-0 z-0">
+            <div className={`absolute inset-0 z-0 ${layoutMode === 'split' ? 'md:left-1/2 md:w-1/2' : ''}`}>
                <img 
                   src={portfolio.cover_image_url} 
                   alt={`${portfolio.title} Cover`}
                   className="w-full h-full object-cover opacity-50" 
                />
-               <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />
+               <div className={`absolute inset-0 bg-gradient-to-t from-[#050505] ${layoutMode === 'split' ? 'md:bg-gradient-to-r md:from-[#050505] md:via-[#050505]/50' : 'via-[#050505]/40'} to-transparent`} />
             </div>
          ) : null}
 
-         <div className="relative z-10 max-w-4xl">
+         <div className={`relative z-10 ${layoutMode === 'split' ? 'md:w-1/2 md:pr-12' : 'max-w-4xl'}`}>
             <motion.h2 
               initial={introInitial} 
               animate={introAnimate} 
@@ -583,15 +611,15 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                       const result = await res.json();
                       
                       if (res.ok) {
-                        alert("Proposition sent successfully! The creator will review and reach out.");
+                        setDialogConfig({isOpen: true, message: "Proposition sent successfully! The creator will review your request. Please keep an eye on your email inbox for their reply.", isError: false});
                         form.reset();
                       } else {
                         // Show the specific error from FastAPI (like 'at least 10 characters')
                         const errorMsg = result.detail?.[0]?.msg || result.detail || "Failed to send.";
-                        alert(`Clearance Error: ${errorMsg}`);
+                        setDialogConfig({isOpen: true, message: `Clearance Error: ${errorMsg}`, isError: true});
                       }
                     } catch (err) {
-                      alert("Network Error. Check your internet or backend status.");
+                      setDialogConfig({isOpen: true, message: "Network Error. Check your internet or backend status.", isError: true});
                     }
                  }}
                >
@@ -607,7 +635,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                     <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Project Details</label>
                     <textarea name="details" required className="w-full bg-transparent border-b-2 border-zinc-800 focus:border-white py-2 text-white outline-none transition-colors h-20 resize-none" />
                   </div>
-                  <button type="submit" className="w-full py-5 bg-white text-black font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-zinc-200 transition flex justify-center items-center gap-3">
+                  <button type="submit" className={`w-full ${btnPrimaryClass}`}>
                      <Send className="w-4 h-4" /> Send Proposition
                   </button>
                </form>
@@ -623,6 +651,39 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
             <FolioLogo iconSize={12} className="text-xs" />
          </div>
       </div>
+
+      {/* Custom Alert Dialog */}
+      {dialogConfig.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`w-full max-w-sm bg-[#0a0a0a] border ${dialogConfig.isError ? 'border-red-500/50' : 'border-zinc-800'} p-6 rounded-xl shadow-2xl flex flex-col items-center text-center`}
+          >
+            {dialogConfig.isError ? (
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mb-4">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-4">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+            )}
+            <h3 className="text-white font-bold text-lg tracking-tight mb-2">
+              {dialogConfig.isError ? 'Error' : 'Success'}
+            </h3>
+            <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
+              {dialogConfig.message}
+            </p>
+            <button 
+              onClick={() => setDialogConfig({isOpen: false, message: ''})}
+              className={`px-6 py-2.5 rounded text-[10px] uppercase tracking-widest font-bold transition-colors w-full ${dialogConfig.isError ? 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20' : 'bg-white text-black hover:bg-zinc-200'}`}
+            >
+              Okay
+            </button>
+          </motion.div>
+        </div>
+      )}
     </main>
   );
 }

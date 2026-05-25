@@ -66,6 +66,9 @@ class Portfolio(Base):
     youtube_url = Column(String, nullable=True)
     instagram_url = Column(String, nullable=True)
 
+    # Advanced Theme Engine
+    theme_config = Column(JSON, nullable=True)
+
     # Style Fingerprint — computed from uploaded videos
     style_fingerprint = Column(JSON, nullable=True)
     fingerprint_computed_at = Column(DateTime, nullable=True)
@@ -91,7 +94,7 @@ class Project(Base):
     __tablename__ = "projects"
 
     id = Column(Integer, primary_key=True, index=True)
-    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     project_type = Column(String, default="video") # "video", "gallery", "system"
@@ -155,7 +158,7 @@ class ProjectStory(Base):
     __tablename__ = "project_stories"
 
     id         = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), unique=True, nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), unique=True, nullable=False, index=True)
 
     # Each stage: text note + JSON list of media S3 keys
     # Stage 1 — Brief / Client Brief
@@ -188,7 +191,7 @@ class Inquiry(Base):
     __tablename__ = "inquiries"
 
     id = Column(Integer, primary_key=True, index=True)
-    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.id"), nullable=False, index=True)
     name = Column(String, nullable=False)
     email = Column(String, nullable=False)
     project_details = Column(Text, nullable=False)
@@ -203,7 +206,7 @@ class ProjectComment(Base):
     __tablename__ = "project_comments"
 
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
     timestamp = Column(Integer, nullable=True) # Time in seconds on the video player
     text = Column(Text, nullable=False)
     author_name = Column(String, nullable=True)
@@ -226,7 +229,7 @@ class TrustedDevice(Base):
     __tablename__ = "trusted_devices"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     token_hash = Column(String, index=True, nullable=False)
     device_name = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)

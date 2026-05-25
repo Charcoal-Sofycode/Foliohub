@@ -52,7 +52,8 @@ import {
   LifeBuoy,
   Book,
   Bug,
-  Lightbulb
+  Lightbulb,
+  LayoutTemplate
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -856,6 +857,24 @@ function DashboardContent() {
         data.cover_image_url = portfolio?.cover_image_url || "";
       }
 
+      // Bundle theme_config fields
+      const theme_config = {
+        layout_mode: formData.get('theme_layout_mode') || 'classic',
+        primary_font: formData.get('theme_primary_font') || 'inter',
+        button_style: formData.get('theme_button_style') || 'solid',
+        element_scale: formData.get('theme_element_scale') || 'md',
+        animation_level: formData.get('theme_animation_level') || 'dynamic'
+      };
+      
+      // Clean up the flat data object so we don't send unwanted fields
+      delete data['theme_layout_mode'];
+      delete data['theme_primary_font'];
+      delete data['theme_button_style'];
+      delete data['theme_element_scale'];
+      delete data['theme_animation_level'];
+
+      data.theme_config = theme_config;
+
       const res = await api.put('/portfolios/me', data);
       setPortfolio(res.data);
       setAgreementFile(null);
@@ -1224,31 +1243,7 @@ function DashboardContent() {
                     <Plus className="w-4 h-4" /> Ingest Media
                   </button>
                 )}
-                {activeTab === 'reviews' && reviewsData.length > 0 && (
-                  <button 
-                    onClick={() => {
-                      triggerConfirm(
-                        "Are you sure you want to permanently clear all review histories across all projects? This cannot be undone.",
-                        async () => {
-                          try {
-                            await api.delete('/my-reviews/clear-all');
-                            fetchReviews();
-                            setSelectedComments([]);
-                            triggerAlert("All review histories cleared!");
-                          } catch (err) {
-                            console.error(err);
-                            triggerAlert("Failed to clear review history.");
-                          }
-                        },
-                        undefined,
-                        true
-                      );
-                    }}
-                    className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 border border-red-500/20 hover:border-red-500/50 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-bold uppercase tracking-widest text-[10px] rounded transition duration-200"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Clear All History
-                  </button>
-                )}
+                {/* Clear All History button removed to ensure reviews are permanent unless project is deleted */}
               </header>
 
               {activeTab === 'projects' && (
@@ -1698,27 +1693,6 @@ function DashboardContent() {
                           {/* Project Header */}
                           <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              {projectReview.comments.length > 0 && (
-                                <input 
-                                  type="checkbox"
-                                  checked={allCommentsOfProjectSelected}
-                                  ref={(el) => {
-                                    if (el) {
-                                      el.indeterminate = someCommentsOfProjectSelected;
-                                    }
-                                  }}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      const toAdd = projectCommentIds.filter((id: number) => !selectedComments.includes(id));
-                                      setSelectedComments([...selectedComments, ...toAdd]);
-                                    } else {
-                                      setSelectedComments(selectedComments.filter(id => !projectCommentIds.includes(id)));
-                                    }
-                                  }}
-                                  className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-[#6366f1] focus:ring-0 cursor-pointer mr-1"
-                                  title="Select all comments in this project"
-                                />
-                              )}
                               <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
                                 <Play className="w-4 h-4" />
                               </div>
@@ -1744,30 +1718,6 @@ function DashboardContent() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => {
-                                  triggerConfirm(
-                                    `Clear all review history for "${projectReview.project_title}"?`,
-                                    async () => {
-                                      try {
-                                        await api.delete(`/projects/${projectReview.project_id}/comments`);
-                                        fetchReviews();
-                                        setSelectedComments(selectedComments.filter(id => !projectReview.comments.some((c: any) => c.id === id)));
-                                        triggerAlert("Project review history cleared!");
-                                      } catch (err) {
-                                        console.error(err);
-                                        triggerAlert("Failed to clear project history.");
-                                      }
-                                    },
-                                    undefined,
-                                    true
-                                  );
-                                }}
-                                className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500/50 rounded transition text-red-400 flex items-center gap-2"
-                                title="Clear all comments and reset status"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Clear History
-                              </button>
-                              <button
-                                onClick={() => {
                                   const url = window.location.origin + `/review/${projectReview.project_id}`;
                                   window.open(url, '_blank');
                                 }}
@@ -1780,65 +1730,12 @@ function DashboardContent() {
 
                           {/* Comments List */}
                           <div className="divide-y divide-zinc-900/50">
-                            {projectSelectedIds.length > 0 && (
-                              <div className="p-4 px-6 bg-red-500/5 border-b border-zinc-900 flex items-center justify-between animate-fadeIn">
-                                <span className="text-[10px] font-mono text-red-400 uppercase tracking-wider font-bold">
-                                  {projectSelectedIds.length} Comment{projectSelectedIds.length !== 1 ? 's' : ''} Selected
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedComments(selectedComments.filter(id => !projectSelectedIds.includes(id)));
-                                    }}
-                                    className="text-[9px] font-mono text-zinc-500 hover:text-white uppercase tracking-widest font-bold px-2 py-1 transition"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      triggerConfirm(
-                                        `Delete ${projectSelectedIds.length} selected comments permanently?`,
-                                        async () => {
-                                          try {
-                                            await api.post('/comments/bulk-delete', { comment_ids: projectSelectedIds });
-                                            setSelectedComments(selectedComments.filter(id => !projectSelectedIds.includes(id)));
-                                            fetchReviews();
-                                            triggerAlert("Selected comments deleted successfully!");
-                                          } catch (err) {
-                                            console.error(err);
-                                            triggerAlert("Failed to delete comments.");
-                                          }
-                                        },
-                                        undefined,
-                                        true
-                                      );
-                                    }}
-                                    className="text-[9px] font-mono bg-red-500/10 border border-red-500/30 hover:bg-red-500 hover:text-white transition text-red-400 px-3 py-1 rounded uppercase tracking-widest font-bold flex items-center gap-1.5"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" /> Delete Selected
-                                  </button>
-                                </div>
-                              </div>
-                            )}
+
 
                             {projectReview.comments.map((comment: any) => {
                               const isChecked = selectedComments.includes(comment.id);
                               return (
                                 <div key={comment.id} className="p-5 px-6 flex items-start gap-4 hover:bg-zinc-900/30 transition group">
-                                  <div className="flex items-center mt-1 mr-1 shrink-0">
-                                    <input 
-                                      type="checkbox"
-                                      checked={isChecked}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedComments([...selectedComments, comment.id]);
-                                        } else {
-                                          setSelectedComments(selectedComments.filter(id => id !== comment.id));
-                                        }
-                                      }}
-                                      className="w-4 h-4 rounded border-zinc-800 bg-zinc-900 text-[#6366f1] focus:ring-0 cursor-pointer"
-                                    />
-                                  </div>
                                   <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
                                     <span className="text-[10px] font-bold text-zinc-400 uppercase">
                                       {comment.author_name?.charAt(0) || '?'}
@@ -1878,23 +1775,6 @@ function DashboardContent() {
                                     >
                                       {comment.is_resolved ? 'Reopen' : 'Resolve'}
                                     </button>
-                                    <button 
-                                      onClick={() => {
-                                        triggerConfirm(
-                                          "Permanently delete this comment?",
-                                          async () => {
-                                            await api.delete(`/comments/${comment.id}`);
-                                            fetchReviews();
-                                          },
-                                          undefined,
-                                          true
-                                        );
-                                      }}
-                                      className="p-1.5 rounded hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition"
-                                      title="Delete Feedback"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
                                   </div>
                                 </div>
                               );
@@ -1905,55 +1785,7 @@ function DashboardContent() {
                     })
                   )}
 
-                  {/* Global Floating Bulk Actions Bar */}
-                  <AnimatePresence>
-                    {selectedComments.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 50, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 50, scale: 0.95 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] bg-black/80 backdrop-blur-xl border border-zinc-800 p-4 px-6 rounded-full shadow-[0_10px_50px_rgba(0,0,0,0.8)] flex items-center gap-6"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
-                          <span className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-widest">
-                            {selectedComments.length} Selected
-                          </span>
-                        </div>
-                        
-                        <div className="h-4 w-px bg-zinc-800" />
-                        
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setSelectedComments([])}
-                            className="text-[10px] font-mono text-zinc-500 hover:text-white uppercase tracking-widest font-bold px-3 py-2 transition"
-                          >
-                            Clear
-                          </button>
-                          
-                          <button
-                            onClick={async () => {
-                              if (confirm(`Delete all ${selectedComments.length} selected comments permanently?`)) {
-                                try {
-                                  await api.post('/comments/bulk-delete', { comment_ids: selectedComments });
-                                  setSelectedComments([]);
-                                  fetchReviews();
-                                  alert("Selected comments deleted successfully!");
-                                } catch (err) {
-                                  console.error(err);
-                                  alert("Failed to delete comments.");
-                                }
-                              }
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white text-[10px] font-mono font-bold uppercase tracking-widest px-4 py-2 rounded-full transition flex items-center gap-2 shadow-lg shadow-red-500/20"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" /> Delete
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+
                 </motion.div>
                 )
               )}
@@ -2254,6 +2086,50 @@ function DashboardContent() {
                         </div>
                      </div>
                      <div className="pt-8 border-t border-zinc-900">
+                        <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3 flex items-center gap-2">
+                           <LayoutTemplate className="w-4 h-4 text-brand" /> Studio Theme Engine
+                        </label>
+                        <p className="text-xs text-zinc-600 mb-6 font-light">Next-level customization. Tailor your portfolio's exact layout, typography, and element aesthetics.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Layout Mode</label>
+                              <select name="theme_layout_mode" defaultValue={portfolio?.theme_config?.layout_mode || 'classic'} className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm py-3 px-4 rounded-lg focus:outline-none focus:border-white transition-colors appearance-none">
+                                 <option value="classic">Classic Hero (Centered)</option>
+                                 <option value="split">Split Screen (Image Right)</option>
+                                 <option value="minimal">Minimalist Grid</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Primary Typography</label>
+                              <select name="theme_primary_font" defaultValue={portfolio?.theme_config?.primary_font || 'inter'} className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm py-3 px-4 rounded-lg focus:outline-none focus:border-white transition-colors appearance-none">
+                                 <option value="inter">Inter (Modern & Clean)</option>
+                                 <option value="playfair">Playfair Display (Elegant Serif)</option>
+                                 <option value="space">Space Grotesk (Tech & Edgy)</option>
+                                 <option value="outfit">Outfit (Bold & Geometric)</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Button Aesthetic</label>
+                              <select name="theme_button_style" defaultValue={portfolio?.theme_config?.button_style || 'solid'} className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm py-3 px-4 rounded-lg focus:outline-none focus:border-white transition-colors appearance-none">
+                                 <option value="solid">Solid Fill</option>
+                                 <option value="outline">Thin Outline</option>
+                                 <option value="glass">Glassmorphism (Frosted)</option>
+                              </select>
+                           </div>
+                           <div>
+                              <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-2">Element Scale</label>
+                              <select name="theme_element_scale" defaultValue={portfolio?.theme_config?.element_scale || 'md'} className="w-full bg-zinc-900 border border-zinc-800 text-white text-sm py-3 px-4 rounded-lg focus:outline-none focus:border-white transition-colors appearance-none">
+                                 <option value="sm">Compact (Small)</option>
+                                 <option value="md">Balanced (Medium)</option>
+                                 <option value="lg">Oversized (Large)</option>
+                              </select>
+                           </div>
+                        </div>
+                     </div>
+                     <button type="submit" disabled={settingsLoading} className="px-8 py-4 bg-white text-black font-bold text-[11px] uppercase tracking-[0.2em] rounded-sm hover:bg-zinc-200 transition">Update Configuration</button>
+                    </form>
+
+                     <div className="pt-8 mt-10">
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Security & Access</label>
                         <div className="bg-black border border-zinc-800 p-6 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
                            <div>
@@ -2308,9 +2184,6 @@ function DashboardContent() {
                             </div>
                         </div>
                      </div>
-
-                     <button type="submit" disabled={settingsLoading} className="px-8 py-4 bg-white text-black font-bold text-[11px] uppercase tracking-[0.2em] rounded-sm hover:bg-zinc-200 transition">Update Configuration</button>
-                    </form>
 
                     <div className="mt-20 pt-10 border-t border-zinc-900">
                        <h3 className="text-xl font-bold text-white mb-6 tracking-tight">Identity & Security Operations</h3>

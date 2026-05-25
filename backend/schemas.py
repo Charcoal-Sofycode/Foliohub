@@ -161,6 +161,7 @@ class PortfolioUpdate(BaseModel):
     accent_color: Optional[str] = None
     typography: Optional[str] = None
     intro_style: Optional[str] = None
+    theme_config: Optional[Any] = None
     showreel_url: Optional[str] = None
     skills: Optional[str] = None
     location: Optional[str] = None
@@ -198,6 +199,7 @@ class PortfolioResponse(BaseModel):
     accent_color: Optional[str] = "#ffffff"
     typography: Optional[str] = "sans"
     intro_style: Optional[str] = "default"
+    theme_config: Optional[Any] = None
     showreel_url: Optional[str] = None
     skills: Optional[str] = None
     location: Optional[str] = None
