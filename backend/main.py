@@ -63,9 +63,319 @@ except Exception as schema_err:
 
 app = FastAPI(title="Portfolio SaaS API")
 
+# ── SQLAdmin Integration (Option B) ───────────────────────────────────────────
+from sqladmin import Admin, ModelView, BaseView, expose
+
+class UserAdmin(ModelView, model=models.User):
+    name = "User"
+    name_plural = "Users"
+    icon = "fa-solid fa-user"
+    column_list = [models.User.id, models.User.email, models.User.is_active, models.User.subscription_tier, models.User.created_at]
+    column_searchable_list = [models.User.email]
+    column_sortable_list = [models.User.id, models.User.created_at]
+
+class PortfolioAdmin(ModelView, model=models.Portfolio):
+    name = "Portfolio"
+    name_plural = "Portfolios"
+    icon = "fa-solid fa-folder-open"
+    column_list = [models.Portfolio.id, models.Portfolio.subdomain, models.Portfolio.custom_domain, models.Portfolio.title, models.Portfolio.view_count]
+    column_searchable_list = [models.Portfolio.subdomain, models.Portfolio.custom_domain, models.Portfolio.title]
+    column_sortable_list = [models.Portfolio.id, models.Portfolio.view_count]
+
+class ProjectAdmin(ModelView, model=models.Project):
+    name = "Project"
+    name_plural = "Projects"
+    icon = "fa-solid fa-video"
+    column_list = [models.Project.id, models.Project.title, models.Project.project_type, models.Project.transcoding_status, models.Project.is_verified, models.Project.is_published, models.Project.view_count]
+    column_searchable_list = [models.Project.title, models.Project.description]
+    column_sortable_list = [models.Project.id, models.Project.view_count, models.Project.created_at]
+
+class InquiryAdmin(ModelView, model=models.Inquiry):
+    name = "Inquiry"
+    name_plural = "Inquiries"
+    icon = "fa-solid fa-envelope"
+    column_list = [models.Inquiry.id, models.Inquiry.name, models.Inquiry.email, models.Inquiry.is_read, models.Inquiry.created_at]
+    column_searchable_list = [models.Inquiry.name, models.Inquiry.email, models.Inquiry.project_details]
+    column_sortable_list = [models.Inquiry.id, models.Inquiry.created_at]
+
+class ProjectCommentAdmin(ModelView, model=models.ProjectComment):
+    name = "Comment"
+    name_plural = "Comments"
+    icon = "fa-solid fa-comments"
+    column_list = [models.ProjectComment.id, models.ProjectComment.author_name, models.ProjectComment.timestamp, models.ProjectComment.is_resolved, models.ProjectComment.created_at]
+    column_searchable_list = [models.ProjectComment.author_name, models.ProjectComment.text]
+    column_sortable_list = [models.ProjectComment.id, models.ProjectComment.created_at]
+
+class S3MetricsAdmin(BaseView):
+    name = "System & Cost Monitor"
+    icon = "fa-solid fa-chart-pie"
+
+    @expose("/s3-metrics", methods=["GET"])
+    async def s3_metrics_page(self, request: Request):
+        import boto3
+        import os
+        from sqlalchemy.orm import Session
+        from database import engine
+        import models
+        
+        aws_key = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
+        bucket_name = os.getenv("AWS_BUCKET_NAME", "sofycode-portfolio-assets")
+        aws_region = os.getenv("AWS_REGION", "eu-north-1")
+        
+        error_msg = None
+        metrics = None
+        system_metrics = None
+        
+        # Calculate Database & Operations Stats
+        try:
+            with Session(engine) as db:
+                users_count = db.query(models.User).count()
+                premium_users = db.query(models.User).filter(models.User.subscription_tier == "premium").count()
+                portfolios_count = db.query(models.Portfolio).count()
+                projects_count = db.query(models.Project).count()
+                inquiries_count = db.query(models.Inquiry).count()
+                comments_count = db.query(models.ProjectComment).count()
+                trusted_devices_count = db.query(models.TrustedDevice).count()
+                
+                # Transcoding
+                pending_transcodes = db.query(models.Project).filter(models.Project.transcoding_status == "pending").count()
+                processing_transcodes = db.query(models.Project).filter(models.Project.transcoding_status == "processing").count()
+                completed_transcodes = db.query(models.Project).filter(models.Project.transcoding_status == "completed").count()
+                failed_transcodes = db.query(models.Project).filter(models.Project.transcoding_status == "failed").count()
+                
+                # Financials (Premium plan costs $5.00/mo. PayPal transaction fee is 2.9% + $0.30 by default, fully configurable via env)
+                PREMIUM_PRICE = float(os.getenv("PREMIUM_PRICE", "5.00"))
+                PAYPAL_FEE_PERCENT = float(os.getenv("PAYPAL_FEE_PERCENT", "2.9"))
+                PAYPAL_FEE_FIXED = float(os.getenv("PAYPAL_FEE_FIXED", "0.30"))
+                
+                gross_mrr = premium_users * PREMIUM_PRICE
+                PAYPAL_FEE_PER_TX = (PREMIUM_PRICE * (PAYPAL_FEE_PERCENT / 100)) + PAYPAL_FEE_FIXED
+                total_paypal_fees = premium_users * PAYPAL_FEE_PER_TX
+                net_mrr = gross_mrr - total_paypal_fees
+                
+                # Estimate Resend sent volume
+                estimated_emails_sent = (users_count * 2) + trusted_devices_count
+                
+                system_metrics = {
+                    "users_count": users_count,
+                    "premium_users": premium_users,
+                    "free_users": users_count - premium_users,
+                    "portfolios_count": portfolios_count,
+                    "projects_count": projects_count,
+                    "inquiries_count": inquiries_count,
+                    "comments_count": comments_count,
+                    "trusted_devices_count": trusted_devices_count,
+                    "total_rows": users_count + portfolios_count + projects_count + inquiries_count + comments_count + trusted_devices_count,
+                    
+                    "gross_mrr": round(gross_mrr, 2),
+                    "total_paypal_fees": round(total_paypal_fees, 2),
+                    "net_mrr": round(net_mrr, 2),
+                    
+                    "estimated_emails_sent": estimated_emails_sent,
+                    
+                    "transcoding_pending": pending_transcodes,
+                    "transcoding_processing": processing_transcodes,
+                    "transcoding_completed": completed_transcodes,
+                    "transcoding_failed": failed_transcodes,
+                    "premium_price_usd": PREMIUM_PRICE,
+                    "paypal_fee_percent": PAYPAL_FEE_PERCENT,
+                    "paypal_fee_fixed": PAYPAL_FEE_FIXED
+                }
+        except Exception as db_err:
+            # Non-blocking operational metrics error
+            print(f"Failed to query database stats: {db_err}")
+        
+        # Fetch Official AWS Billing from CloudWatch (us-east-1)
+        official_s3_bill = None
+        official_total_bill = None
+        if aws_key and aws_secret:
+            try:
+                from datetime import datetime, timezone, timedelta
+                cw = boto3.client(
+                    'cloudwatch',
+                    aws_access_key_id=aws_key,
+                    aws_secret_access_key=aws_secret,
+                    region_name='us-east-1'  # Billing metrics are ALWAYS stored in us-east-1
+                )
+                
+                # Fetch S3 billing specifically
+                s3_res = cw.get_metric_data(
+                    MetricDataQueries=[
+                        {
+                            'Id': 's3_bill',
+                            'MetricStat': {
+                                'Metric': {
+                                    'Namespace': 'AWS/Billing',
+                                    'MetricName': 'EstimatedCharges',
+                                    'Dimensions': [
+                                        {'Name': 'Currency', 'Value': 'USD'},
+                                        {'Name': 'ServiceName', 'Value': 'AmazonS3'}
+                                    ]
+                                },
+                                'Period': 86400,
+                                'Stat': 'Maximum'
+                            }
+                        }
+                    ],
+                    StartTime=datetime.now(timezone.utc) - timedelta(days=2),
+                    EndTime=datetime.now(timezone.utc)
+                )
+                
+                # Fetch total billing across all AWS services
+                total_res = cw.get_metric_data(
+                    MetricDataQueries=[
+                        {
+                            'Id': 'total_bill',
+                            'MetricStat': {
+                                'Metric': {
+                                    'Namespace': 'AWS/Billing',
+                                    'MetricName': 'EstimatedCharges',
+                                    'Dimensions': [
+                                        {'Name': 'Currency', 'Value': 'USD'}
+                                    ]
+                                },
+                                'Period': 86400,
+                                'Stat': 'Maximum'
+                            }
+                        }
+                    ],
+                    StartTime=datetime.now(timezone.utc) - timedelta(days=2),
+                    EndTime=datetime.now(timezone.utc)
+                )
+                
+                if s3_res and 'MetricDataResults' in s3_res and s3_res['MetricDataResults'][0]['Values']:
+                    official_s3_bill = round(s3_res['MetricDataResults'][0]['Values'][0], 2)
+                    
+                if total_res and 'MetricDataResults' in total_res and total_res['MetricDataResults'][0]['Values']:
+                    official_total_bill = round(total_res['MetricDataResults'][0]['Values'][0], 2)
+                    
+            except Exception as cw_err:
+                print(f"CloudWatch Billing metrics fetch skipped (expected if billing metrics are disabled or lack IAM ce/billing permissions): {cw_err}")
+        
+        # Calculate AWS Storage Metrics
+        if not aws_key or not aws_secret:
+            error_msg = "AWS credentials not fully configured in backend environment (.env)"
+        else:
+            try:
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=aws_key,
+                    aws_secret_access_key=aws_secret,
+                    region_name=aws_region
+                )
+                
+                total_size_bytes = 0
+                total_objects = 0
+                
+                paginator = s3.get_paginator('list_objects_v2')
+                for page in paginator.paginate(Bucket=bucket_name):
+                    if 'Contents' in page:
+                        for obj in page['Contents']:
+                            total_size_bytes += obj['Size']
+                            total_objects += 1
+                            
+                total_size_gb = total_size_bytes / (1024 ** 3)
+                S3_PRICE_PER_GB = float(os.getenv("S3_PRICE_PER_GB", "0.023"))
+                estimated_monthly_cost = total_size_gb * S3_PRICE_PER_GB
+                
+                metrics = {
+                    "bucket_name": bucket_name,
+                    "region": aws_region,
+                    "total_objects": total_objects,
+                    "total_size_bytes": total_size_bytes,
+                    "total_size_gb": round(total_size_gb, 4),
+                    "estimated_monthly_cost_usd": round(estimated_monthly_cost, 4),
+                    "pricing_rate_usd_per_gb": S3_PRICE_PER_GB
+                }
+            except Exception as e:
+                error_msg = f"Failed to fetch S3 metrics from AWS API: {str(e)}"
+        
+        return await self.templates.TemplateResponse(
+            request,
+            "s3_metrics.html",
+            {
+                "request": request,
+                "metrics": metrics,
+                "system_metrics": system_metrics,
+                "official_s3_bill": official_s3_bill,
+                "official_total_bill": official_total_bill,
+                "error": error_msg
+            }
+        )
+
+# Initialize Admin
+admin = Admin(app, engine, templates_dir="templates")
+admin.add_view(UserAdmin)
+admin.add_view(PortfolioAdmin)
+admin.add_view(ProjectAdmin)
+admin.add_view(InquiryAdmin)
+admin.add_view(ProjectCommentAdmin)
+admin.add_base_view(S3MetricsAdmin)
+
 @app.get("/health")
 def health_check():
     return {"status": "awake"}
+
+@app.get("/api/admin/s3-metrics")
+def get_s3_metrics(db: Session = Depends(get_db)):
+    """Calculate S3 bucket storage usage and estimate monthly billing cost in real-time."""
+    import boto3
+    import os
+    
+    aws_key = os.getenv("AWS_ACCESS_KEY_ID")
+    aws_secret = os.getenv("AWS_SECRET_ACCESS_KEY")
+    bucket_name = os.getenv("AWS_BUCKET_NAME", "sofycode-portfolio-assets")
+    aws_region = os.getenv("AWS_REGION", "eu-north-1")
+    
+    if not aws_key or not aws_secret:
+        raise HTTPException(
+            status_code=400, 
+            detail="AWS credentials not fully configured in backend environment (.env)"
+        )
+        
+    try:
+        # Initialize boto3 S3 client
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=aws_key,
+            aws_secret_access_key=aws_secret,
+            region_name=aws_region
+        )
+        
+        total_size_bytes = 0
+        total_objects = 0
+        
+        # Paginate S3 objects safely
+        paginator = s3.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket_name):
+            if 'Contents' in page:
+                for obj in page['Contents']:
+                    total_size_bytes += obj['Size']
+                    total_objects += 1
+                    
+        total_size_gb = total_size_bytes / (1024 ** 3)
+        
+        # Standard S3 pricing: $0.023 per GB/month for standard tier
+        S3_PRICE_PER_GB = 0.023
+        estimated_monthly_cost = total_size_gb * S3_PRICE_PER_GB
+        
+        return {
+            "status": "success",
+            "bucket_name": bucket_name,
+            "region": aws_region,
+            "total_objects": total_objects,
+            "total_size_bytes": total_size_bytes,
+            "total_size_gb": round(total_size_gb, 4),
+            "estimated_monthly_cost_usd": round(estimated_monthly_cost, 4),
+            "pricing_rate_usd_per_gb": S3_PRICE_PER_GB
+        }
+    except Exception as e:
+        logger.error(f"S3 metrics error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch S3 metrics from AWS API: {str(e)}"
+        )
 
 @app.get("/debug/test-email")
 def debug_test_email(email: str, db: Session = Depends(get_db)):

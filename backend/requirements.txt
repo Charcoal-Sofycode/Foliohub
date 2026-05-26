@@ -14,3 +14,4 @@ boto3
 slowapi
 python-dotenv
 requests
+sqladmin
