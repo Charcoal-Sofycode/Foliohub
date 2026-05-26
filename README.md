@@ -27,7 +27,7 @@ FolioHub is a high-performance, studio-grade SaaS portfolio platform engineered 
 - **Asynchronous Tasks:** Python Multiprocessing & BackgroundTasks
 - **Storage:** AWS S3 (Signed URLs & direct-upload policies)
 - **Database:** SQLAlchemy (PostgreSQL / Supabase)
-- **Payments:** Stripe API (Tiered project limits)
+- **Payments:** PayPal API (Subscriptions & One-Time Payments)
 
 ## 📂 Project Structure
 
@@ -59,7 +59,7 @@ Foliohub/
 2. `python -m venv venv`
 3. `venv\Scripts\activate` (Windows)
 4. `pip install -r requirements.txt` (including `boto3`, `fastapi`, `sqlalchemy`)
-5. Configure `.env` with AWS and Stripe keys.
+5. Configure `.env` with AWS, SMTP, and PayPal credentials.
 6. `uvicorn main:app --reload`
 
 # Install FFmpeg

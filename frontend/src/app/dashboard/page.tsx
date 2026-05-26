@@ -224,7 +224,7 @@ function DashboardContent() {
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
+  const sessionId = searchParams.get('session_id') || searchParams.get('subscription_id') || searchParams.get('token');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -2320,12 +2320,12 @@ function DashboardContent() {
                                const res = await api.post('/create-checkout-session');
                                window.location.href = res.data.url;
                              } catch (e) {
-                               alert("Failed to initialize Stripe. Verify API keys.");
+                               alert("Failed to initiate checkout. Please verify system configuration.");
                              }
                           }}
-                          className="w-full flex items-center justify-center gap-2 py-4 bg-white hover:bg-zinc-200 text-black font-bold uppercase tracking-widest text-[11px] rounded transition"
+                          className="w-full flex items-center justify-center gap-2 py-4 bg-[#ffc439] hover:bg-[#f2ba36] text-black font-bold uppercase tracking-widest text-[11px] rounded transition"
                         >
-                          <Shield className="w-3 h-3"/> Checkout with Stripe
+                          <Shield className="w-3 h-3"/> Checkout with PayPal
                         </button>
                       )}
                     </div>
