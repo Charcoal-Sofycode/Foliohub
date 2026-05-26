@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
-import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Space_Grotesk, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const interSans = Inter({
-  variable: "--font-inter",
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
   subsets: ["latin"],
 });
 
-const outfitDisplay = Outfit({
-  variable: "--font-outfit",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
-const jbMono = JetBrains_Mono({
-  variable: "--font-mono",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${interSans.variable} ${outfitDisplay.variable} ${jbMono.variable} h-full antialiased dark scroll-smooth`}
+      className={`${plusJakarta.variable} ${spaceGrotesk.variable} ${geistMono.variable} h-full antialiased dark scroll-smooth`}
     >
       <body className="min-h-full flex flex-col font-sans bg-[#050505] text-white selection:bg-white selection:text-black overflow-x-hidden">
         <div className="fixed inset-0 z-[-1] bg-[radial-gradient(circle_at_50%_0%,rgba(20,20,20,1)_0%,rgba(5,5,5,1)_100%)]"></div>

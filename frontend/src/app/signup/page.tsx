@@ -5,9 +5,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, Eye, EyeOff, Lock } from 'lucide-react';
 import api from '@/lib/api';
 import FolioLogo from '@/components/FolioLogo';
+import PrivacyVisualizer from '@/components/PrivacyVisualizer';
 
 export default function SignupPage() {
   const [step, setStep] = useState<'email' | 'otp' | 'password'>('email');
@@ -19,6 +20,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const router = useRouter();
 
   // STEP 1: Request OTP
@@ -86,11 +88,13 @@ export default function SignupPage() {
           <video 
             autoPlay loop muted playsInline 
             className="w-full h-full object-cover filter contrast-125 saturate-50 grayscale select-none pointer-events-none"
-            src="https://sofycode-portfolio-assets.s3.eu-north-1.amazonaws.com/72de9afc-1b3c-4b2b-8efd-7a1fcb63d489.mp4" 
             onContextMenu={(e) => e.preventDefault()}
             controlsList="nodownload"
             disablePictureInPicture
-          />
+          >
+            <source src="/signup-opt.webm" type="video/webm" />
+            <source src="/signup-opt.mp4" type="video/mp4" />
+          </video>
         </div>
 
         <div className="relative z-50">
@@ -209,18 +213,20 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 pt-4">
-                   <div className="relative flex items-center h-5">
-                      <input 
-                        type="checkbox" 
-                        checked={isAgreed}
-                        onChange={(e) => setIsAgreed(e.target.checked)}
-                        className="w-4 h-4 rounded border-zinc-800 bg-black text-white focus:ring-0 focus:ring-offset-0 transition cursor-pointer" 
-                      />
-                   </div>
-                   <label className="text-[10px] text-zinc-500 font-light leading-relaxed">
-                      I acknowledge the <span className="text-white hover:underline cursor-pointer">Privacy Policy</span> and agree that my uploaded media will be processed via secure AWS S3 environments.
-                   </label>
+                <div className="flex flex-col gap-3 pt-4">
+                   {!isAgreed ? (
+                     <button
+                       type="button"
+                       onClick={() => setShowPrivacy(true)}
+                       className="w-full flex items-center justify-center gap-2 py-4 border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:border-zinc-700 transition rounded-sm text-xs font-bold tracking-widest uppercase text-white"
+                     >
+                       <Lock className="w-4 h-4 text-zinc-400" /> Review & Accept Privacy Policy
+                     </button>
+                   ) : (
+                     <div className="w-full flex items-center justify-center gap-2 py-4 border border-emerald-500/30 bg-emerald-500/10 rounded-sm text-xs font-bold tracking-widest uppercase text-emerald-400">
+                       <CheckCircle2 className="w-4 h-4" /> Privacy Policy Accepted
+                     </div>
+                   )}
                 </div>
               </>
             )}
@@ -264,6 +270,13 @@ export default function SignupPage() {
           </div>
         </motion.div>
       </div>
+
+      {showPrivacy && (
+        <PrivacyVisualizer 
+          onAccept={() => setIsAgreed(true)} 
+          onClose={() => setShowPrivacy(false)} 
+        />
+      )}
     </main>
   );
 }

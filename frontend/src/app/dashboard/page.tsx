@@ -1357,7 +1357,7 @@ function DashboardContent() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.05 }}
                           key={project.id} 
-                          className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-500 hover:scale-[1.015] hover:shadow-[0_0_30px_rgba(255,255,255,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col h-full"
+                          className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden group hover:border-zinc-500 hover:scale-[1.015] hover:shadow-[0_0_30px_rgba(255,255,255,0.03)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col"
                         >
                           <div className="bg-black relative overflow-hidden flex-shrink-0 aspect-video w-full border-b border-zinc-900/50">
                             {project.raw_media_url && project.media_url ? (
@@ -2849,7 +2849,7 @@ function DashboardContent() {
       {/* Security Modals */}
       <AnimatePresence>
         {showManagePasswordModal && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div key="manage-password-modal" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowManagePasswordModal(false)} className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0a0a0a] border border-zinc-800 p-8 sm:p-12 rounded-2xl max-w-md w-full shadow-2xl">
                 <h3 className="text-2xl font-bold text-white mb-2">Key Rotation</h3>
@@ -2886,7 +2886,7 @@ function DashboardContent() {
         )}
 
         {showDeleteAccountModal && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div key="delete-account-modal" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowDeleteAccountModal(false)} className="absolute inset-0 bg-black/95 backdrop-blur-md" />
              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0a0a0a] border border-red-500/20 p-8 sm:p-12 rounded-2xl max-w-lg w-full shadow-2xl">
                 <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-8 border border-red-500/20">
@@ -2901,13 +2901,18 @@ function DashboardContent() {
                       <li>Your public portfolio domain will become dark.</li>
                       <li>Leads, inquiries, and analytics data will be permanently shredded.</li>
                    </ul>
-                   <p className="text-red-500/80 font-mono text-[10px] uppercase mt-4 tracking-widest">Once initiated, this protocol cannot be paused or recovered.</p>
+                   <p className="text-red-400 font-mono text-[10px] font-bold uppercase mt-4 tracking-widest bg-red-500/10 p-3 rounded border border-red-500/20">Once initiated, this protocol cannot be paused or recovered.</p>
                 </div>
                 
                 <form onSubmit={handleDeleteAccount} className="space-y-6">
                    <div className="space-y-2">
                       <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">Confirm Identity with Security Key</label>
                       <input name="verifyPassword" type="password" required placeholder="Enter key to confirm wipe" className="w-full bg-transparent border-b border-red-500/30 focus:border-red-500 py-3 text-white outline-none transition-colors" />
+                      {managementError && (
+                         <div className="text-red-400 font-bold bg-red-500/10 p-3 rounded border border-red-500/20 text-[10px] uppercase tracking-widest font-mono mt-2">
+                            {managementError}
+                         </div>
+                      )}
                    </div>
                    <button type="submit" disabled={managementLoading} className="w-full py-5 bg-red-600 text-white font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-red-700 transition flex items-center justify-center gap-3 shadow-lg shadow-red-900/20">
                       {managementLoading ? 'Commencing Wipe...' : 'Permanently Shred Account'}
@@ -2919,7 +2924,7 @@ function DashboardContent() {
         )}
 
         {show2faSetupModal && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+          <div key="2fa-setup-modal" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShow2faSetupModal(false)} className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
              <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0a0a0a] border border-zinc-800 p-8 sm:p-12 rounded-2xl max-w-md w-full shadow-2xl font-sans">
                 <h3 className="text-2xl font-bold text-white mb-2">
