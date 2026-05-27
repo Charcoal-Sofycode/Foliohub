@@ -741,7 +741,8 @@ export default function Home() {
                 controlsList="nodownload"
                 disablePictureInPicture
               >
-                <source src="/hover-focus.mp4" type="video/mp4" />
+                <source src="/hover-opt.webm" type="video/webm" />
+                <source src="/hover-opt.mp4" type="video/mp4" />
               </video>
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition duration-500">
                  <span className="text-white font-bold tracking-[0.3em] uppercase mix-blend-overlay text-sm sm:text-base">Aesthetic Hover Focus</span>

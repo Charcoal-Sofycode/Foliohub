@@ -1247,6 +1247,37 @@ function DashboardContent() {
                 {/* Clear All History button removed to ensure reviews are permanent unless project is deleted */}
               </header>
 
+              {/* MOBILE ONLY LIVE STATUS & ACTIONS */}
+              <div className="block md:hidden mb-6 space-y-3">
+                <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800 flex items-center justify-between cursor-pointer group" onClick={() => {
+                   const shareUrl = window.location.origin + `/p/${portfolio.subdomain}`;
+                   copyToClipboard(shareUrl);
+                }}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] text-zinc-500 font-mono mb-1 uppercase tracking-[0.2em]">Live Production Status</p>
+                    <span className="text-xs font-semibold text-white truncate block">/p/{portfolio.subdomain}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider group-hover:text-white transition">Copy</span>
+                    <LinkIcon className="w-3.5 h-3.5 text-zinc-500 group-hover:text-white transition" />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <a href="mailto:support@foliohub-swart.vercel.app?subject=Support Request" className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-900/30 border border-zinc-900 rounded-lg text-zinc-400 hover:text-white transition text-xs font-medium">
+                    <LifeBuoy className="w-3.5 h-3.5 text-[#6366f1]" />
+                    <span>Support</span>
+                  </a>
+                  <button 
+                    onClick={handleLogout}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-900/30 border border-zinc-900 rounded-lg text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/20 transition text-xs font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-red-400" />
+                    <span>Disconnect</span>
+                  </button>
+                </div>
+              </div>
+
               {activeTab === 'projects' && (
                 <motion.div 
                   initial={{ opacity: 0 }} 
@@ -1692,95 +1723,97 @@ function DashboardContent() {
                           className="bg-[#050505] border border-zinc-900 rounded-xl overflow-hidden animate-fadeIn"
                         >
                           {/* Project Header */}
-                          <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
-                                <Play className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-white text-sm tracking-tight">{projectReview.project_title}</h4>
-                                <div className="flex items-center gap-3 mt-1">
-                                  <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                                    projectReview.project_status === 'approved'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                      : projectReview.project_status === 'needs_revision'
-                                      ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                  }`}>
-                                    {projectReview.project_status === 'approved' ? '✓ Approved' : projectReview.project_status === 'needs_revision' ? '⚠ Changes Requested' : '● In Review'}
-                                  </span>
-                                  <span className="text-[10px] font-mono text-zinc-600">
-                                    {projectReview.comments.filter((c:any) => !c.is_resolved).length} active review{projectReview.comments.filter((c:any) => !c.is_resolved).length !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  const url = window.location.origin + `/review/${projectReview.project_id}`;
-                                  window.open(url, '_blank');
-                                }}
-                                className="text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center gap-2"
-                              >
-                                <ExternalLink className="w-3 h-3" /> Open Review
-                              </button>
-                            </div>
-                          </div>
+                           <div className="p-6 border-b border-zinc-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400">
+                                 <Play className="w-4 h-4" />
+                               </div>
+                               <div>
+                                 <h4 className="font-bold text-white text-sm tracking-tight">{projectReview.project_title}</h4>
+                                 <div className="flex items-center flex-wrap gap-2 sm:gap-3 mt-1">
+                                   <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                                     projectReview.project_status === 'approved'
+                                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                       : projectReview.project_status === 'needs_revision'
+                                       ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                       : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                   }`}>
+                                     {projectReview.project_status === 'approved' ? '✓ Approved' : projectReview.project_status === 'needs_revision' ? '⚠ Changes Requested' : '● In Review'}
+                                   </span>
+                                   <span className="text-[10px] font-mono text-zinc-600">
+                                     {projectReview.comments.filter((c:any) => !c.is_resolved).length} active review{projectReview.comments.filter((c:any) => !c.is_resolved).length !== 1 ? 's' : ''}
+                                   </span>
+                                 </div>
+                               </div>
+                             </div>
+                             
+                             <div className="flex items-center gap-2">
+                               <button
+                                 onClick={() => {
+                                   const url = window.location.origin + `/review/${projectReview.project_id}`;
+                                   window.open(url, '_blank');
+                                 }}
+                                 className="w-full sm:w-auto text-[10px] font-mono font-bold uppercase tracking-widest px-3 py-2 border border-zinc-800 rounded bg-zinc-900 hover:bg-zinc-800 transition text-zinc-300 flex items-center justify-center gap-2"
+                               >
+                                 <ExternalLink className="w-3 h-3" /> Open Review
+                               </button>
+                             </div>
+                           </div>
 
-                          {/* Comments List */}
-                          <div className="divide-y divide-zinc-900/50">
+                           {/* Comments List */}
+                           <div className="divide-y divide-zinc-900/50">
 
 
-                            {projectReview.comments.map((comment: any) => {
-                              const isChecked = selectedComments.includes(comment.id);
-                              return (
-                                <div key={comment.id} className="p-5 px-6 flex items-start gap-4 hover:bg-zinc-900/30 transition group">
-                                  <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <span className="text-[10px] font-bold text-zinc-400 uppercase">
-                                      {comment.author_name?.charAt(0) || '?'}
-                                    </span>
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-1">
-                                      <span className="text-xs font-bold text-white">{comment.author_name}</span>
-                                      {comment.timestamp != null && (
-                                        <span className="text-[10px] font-mono bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded flex items-center gap-1">
-                                          <Clock className="w-3 h-3" /> {(() => { const m = Math.floor(comment.timestamp / 60); const s = comment.timestamp % 60; return `${m}:${String(s).padStart(2, '0')}`; })()}
-                                        </span>
-                                      )}
-                                      <span className="text-[10px] font-mono text-zinc-700">
-                                        {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-zinc-300 font-light leading-relaxed">{comment.text}</p>
-                                  </div>
+                             {projectReview.comments.map((comment: any) => {
+                               const isChecked = selectedComments.includes(comment.id);
+                               return (
+                                 <div key={comment.id} className="p-5 px-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4 hover:bg-zinc-900/30 transition group">
+                                   <div className="flex items-start gap-4 flex-1 min-w-0 w-full">
+                                     <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                       <span className="text-[10px] font-bold text-zinc-400 uppercase">
+                                         {comment.author_name?.charAt(0) || '?'}
+                                       </span>
+                                     </div>
+                                     <div className="flex-1 min-w-0">
+                                       <div className="flex items-center flex-wrap gap-2 mb-1">
+                                         <span className="text-xs font-bold text-white truncate max-w-[120px] sm:max-w-[200px]">{comment.author_name}</span>
+                                         {comment.timestamp != null && (
+                                           <span className="text-[10px] font-mono bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded flex items-center gap-1">
+                                             <Clock className="w-3 h-3" /> {(() => { const m = Math.floor(comment.timestamp / 60); const s = comment.timestamp % 60; return `${m}:${String(s).padStart(2, '0')}`; })()}
+                                           </span>
+                                         )}
+                                         <span className="text-[10px] font-mono text-zinc-600">
+                                           {comment.created_at ? new Date(comment.created_at).toLocaleDateString() : ''}
+                                         </span>
+                                       </div>
+                                       <p className="text-sm text-zinc-300 font-light leading-relaxed break-words">{comment.text}</p>
+                                     </div>
+                                   </div>
 
-                                  <div className="flex items-center gap-2 transition-opacity">
-                                    {comment.is_resolved && (
-                                      <span className="text-[9px] font-black uppercase tracking-tighter text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 mr-2">
-                                        Resolved
-                                      </span>
-                                    )}
-                                    <button 
-                                      onClick={async () => {
-                                        await api.put(`/comments/${comment.id}`, { is_resolved: !comment.is_resolved });
-                                        fetchReviews();
-                                      }}
-                                      className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-2 ${
-                                        comment.is_resolved 
-                                          ? 'bg-zinc-800 text-zinc-500 hover:text-white' 
-                                          : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
-                                      }`}
-                                    >
-                                      {comment.is_resolved ? 'Reopen' : 'Resolve'}
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                   <div className="flex items-center justify-end gap-2 sm:self-start sm:pl-0 pl-12 self-end">
+                                     {comment.is_resolved && (
+                                       <span className="text-[9px] font-black uppercase tracking-tighter text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                         Resolved
+                                       </span>
+                                     )}
+                                     <button 
+                                       onClick={async () => {
+                                         await api.put(`/comments/${comment.id}`, { is_resolved: !comment.is_resolved });
+                                         fetchReviews();
+                                       }}
+                                       className={`px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-2 ${
+                                         comment.is_resolved 
+                                           ? 'bg-zinc-800 text-zinc-500 hover:text-white' 
+                                           : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                                       }`}
+                                     >
+                                       {comment.is_resolved ? 'Reopen' : 'Resolve'}
+                                     </button>
+                                   </div>
+                                 </div>
+                               );
+                             })}
+                           </div>
                         </motion.div>
                       );
                     })
