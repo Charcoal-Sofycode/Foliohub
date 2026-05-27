@@ -550,8 +550,9 @@ function DashboardContent() {
     setManagementSuccess('');
     const form = e.currentTarget;
     const newEmail = (form.elements.namedItem('newEmail') as HTMLInputElement).value;
+    const emailPassword = (form.elements.namedItem('emailPassword') as HTMLInputElement).value;
     try {
-      await api.patch('/users/me/email', { new_email: newEmail });
+      await api.patch('/users/me/email', { new_email: newEmail, current_password: emailPassword });
       setManagementSuccess('Professional email updated.');
       window.location.reload(); 
     } catch (err: any) {
@@ -2206,6 +2207,7 @@ function DashboardContent() {
                              </div>
                              <form onSubmit={handleUpdateEmail} className="grid grid-cols-1 gap-4">
                                 <input name="newEmail" type="email" placeholder="new-identity@studio.com" required className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm text-white font-light outline-none transition-colors" />
+                                <input name="emailPassword" type="password" placeholder="Current password (required)" required className="w-full bg-transparent border-b border-zinc-800 focus:border-white py-2 text-sm text-white font-light outline-none transition-colors" />
                                 <button type="submit" disabled={managementLoading} className="w-full py-3 bg-zinc-900 border border-zinc-800 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-white hover:text-black transition">Update Identity</button>
                              </form>
                           </div>

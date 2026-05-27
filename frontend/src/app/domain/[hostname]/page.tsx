@@ -205,7 +205,7 @@ export default function CustomDomainPortfolio({ params }: { params: Promise<{ ho
          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20 items-start">
             {filteredProjects.map((project: any) => (
                <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} key={project.id} className="group">
-                  <div className="w-full mb-6 overflow-hidden relative flex justify-center">
+                  <div className="bg-black relative overflow-hidden aspect-video w-full rounded-xl border border-white/5 mb-6">
                      {project.raw_media_url && project.media_url ? (
                         <BeforeAfterPlayer rawUrl={project.raw_media_url || ""} finalUrl={project.media_url} title={project.title} thumbnailUrl={project.thumbnail_url || ""} editorName={portfolio.title} subscriptionTier={portfolio.subscription_tier} />
                       ) : project.media_url ? (

@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
 
 class UserUpdateEmail(BaseModel):
     new_email: EmailStr
+    current_password: str
 
 class UserUpdatePassword(BaseModel):
     current_password: str

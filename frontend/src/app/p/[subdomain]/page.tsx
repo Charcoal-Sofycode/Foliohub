@@ -334,7 +334,7 @@ export default function PortfolioView({ params }: { params: Promise<{ subdomain:
                  key={project.id} 
                  className="group"
                >
-                  <div className="w-full mb-6 overflow-hidden relative flex justify-center">
+                  <div className="bg-black relative overflow-hidden aspect-video w-full rounded-xl border border-white/5 mb-6">
                      {project.raw_media_url && project.media_url ? (
                         <BeforeAfterPlayer 
                            rawUrl={project.raw_media_url || ""}

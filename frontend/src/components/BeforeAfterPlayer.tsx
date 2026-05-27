@@ -103,21 +103,39 @@ export default forwardRef(function BeforeAfterPlayer({
       if (final.paused && isPlaying) final.play().catch(() => {});
       if (raw.paused && isPlaying) raw.play().catch(() => {});
       
-      // Sync raw to final with offset
-      const drift = targetRawTime - raw.currentTime;
-      if (Math.abs(drift) > 0.15) {
-        raw.currentTime = targetRawTime;
-      } else if (Math.abs(drift) > 0.01) {
-        raw.playbackRate = final.playbackRate * (1 + drift * 0.5);
+      // Guard: If either video is actively seeking (common with network latency on remote public portfolio views), 
+      // suspend drift corrections to prevent infinite seek-triggering loops.
+      if (raw.seeking || final.seeking) {
+        if (raw.playbackRate !== final.playbackRate) {
+          raw.playbackRate = final.playbackRate;
+        }
+      } else {
+        // Sync raw to final with offset
+        const drift = targetRawTime - raw.currentTime;
+        if (Math.abs(drift) > 0.15) {
+          raw.currentTime = targetRawTime;
+          raw.playbackRate = final.playbackRate;
+        } else if (Math.abs(drift) > 0.01) {
+          const targetRate = final.playbackRate * (1 + drift * 0.5);
+          raw.playbackRate = Math.max(0.5, Math.min(2.0, targetRate));
+        } else {
+          raw.playbackRate = final.playbackRate;
+        }
       }
-    } else if (watchingRaw) {
-      // Only Raw plays, Final pauses
-      if (raw.paused && isPlaying) raw.play().catch(() => {});
-      if (!final.paused) final.pause();
-    } else if (watchingFinal) {
-      // Only Final plays, Raw pauses
-      if (final.paused && isPlaying) final.play().catch(() => {});
-      if (!raw.paused) raw.pause();
+    } else {
+      // Reset playback rates when not actively in split-screen comparison center
+      if (raw.playbackRate !== 1.0) raw.playbackRate = 1.0;
+      if (final.playbackRate !== 1.0) final.playbackRate = 1.0;
+
+      if (watchingRaw) {
+        // Only Raw plays, Final pauses
+        if (raw.paused && isPlaying) raw.play().catch(() => {});
+        if (!final.paused) final.pause();
+      } else if (watchingFinal) {
+        // Only Final plays, Raw pauses
+        if (final.paused && isPlaying) final.play().catch(() => {});
+        if (!raw.paused) raw.pause();
+      }
     }
 
     // B. UI Update (Always use the one that is currently playing or dominant)

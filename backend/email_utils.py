@@ -43,13 +43,9 @@ def send_resend_api_email(to_email: str, subject: str, html_content: str, text_c
         response = requests.post(url, headers=headers, json=payload, timeout=15)
         if response.status_code in [200, 201]:
             logger.info(f"Email successfully sent via Resend API to {to_email}")
-            with open("otp_debug.log", "a") as f:
-                f.write(f"[{datetime.now().isoformat()}] SUCCESS: API Email sent to {to_email}\n")
             return True
         else:
             logger.error(f"Resend API Error ({response.status_code}): {response.text}")
-            with open("otp_debug.log", "a") as f:
-                f.write(f"[{datetime.now().isoformat()}] API ERROR: {response.status_code} - {response.text}\n")
             return False
     except Exception as e:
         logger.error(f"Failed to connect to Resend API: {e}")
@@ -67,10 +63,6 @@ def send_otp_email(to_email: str, otp: str) -> bool:
     return send_resend_api_email(to_email, subject, html_body, f"Your recovery code is: {otp}")
 
 def send_2fa_email(to_email: str, otp: str) -> bool:
-    # Persistent Debug Log for OTPs
-    with open("otp_debug.log", "a") as f:
-        f.write(f"[{datetime.now().isoformat()}] 2FA OTP for {to_email}: {otp}\n")
-
     subject = f"FolioHub — {otp} is your verification code"
     html_body = f"""
     <div style="font-family:sans-serif;background:#050505;color:white;padding:40px;border-radius:12px;border:1px solid #27272a;">

@@ -63,8 +63,37 @@ except Exception as schema_err:
 
 app = FastAPI(title="Portfolio SaaS API")
 
+# Session middleware required for SQLAdmin authentication
+from starlette.middleware.sessions import SessionMiddleware
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "change-me-in-production"))
+
 # ── SQLAdmin Integration (Option B) ───────────────────────────────────────────
 from sqladmin import Admin, ModelView, BaseView, expose
+from sqladmin.authentication import AuthenticationBackend
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import RedirectResponse
+
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@foliohub.com")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "FolioHub@Admin2025")
+
+class AdminAuth(AuthenticationBackend):
+    async def login(self, request: StarletteRequest) -> bool:
+        form = await request.form()
+        username = form.get("username", "")
+        password = form.get("password", "")
+        if username == ADMIN_EMAIL and password == ADMIN_PASSWORD:
+            request.session.update({"admin_authenticated": True})
+            return True
+        return False
+
+    async def logout(self, request: StarletteRequest) -> bool:
+        request.session.clear()
+        return True
+
+    async def authenticate(self, request: StarletteRequest) -> bool:
+        return request.session.get("admin_authenticated", False)
+
+admin_auth = AdminAuth(secret_key=os.getenv("SECRET_KEY", "change-me-in-production"))
 
 class UserAdmin(ModelView, model=models.User):
     name = "User"
@@ -305,7 +334,7 @@ class S3MetricsAdmin(BaseView):
         )
 
 # Initialize Admin
-admin = Admin(app, engine, templates_dir="templates")
+admin = Admin(app, engine, templates_dir="templates", authentication_backend=admin_auth)
 admin.add_view(UserAdmin)
 admin.add_view(PortfolioAdmin)
 admin.add_view(ProjectAdmin)
@@ -318,8 +347,9 @@ def health_check():
     return {"status": "awake"}
 
 @app.get("/api/admin/s3-metrics")
-def get_s3_metrics(db: Session = Depends(get_db)):
-    """Calculate S3 bucket storage usage and estimate monthly billing cost in real-time."""
+def get_s3_metrics(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Calculate S3 bucket storage usage and estimate monthly billing cost in real-time.
+    Protected: requires authenticated user."""
     import boto3
     import os
     
@@ -377,27 +407,7 @@ def get_s3_metrics(db: Session = Depends(get_db)):
             detail=f"Failed to fetch S3 metrics from AWS API: {str(e)}"
         )
 
-@app.get("/debug/test-email")
-def debug_test_email(email: str, db: Session = Depends(get_db)):
-    """Diagnostic route to test email delivery via Resend API."""
-    from email_utils import send_2fa_email
-    import email_utils
-    
-    config_info = {
-        "api_key_configured": bool(email_utils.RESEND_API_KEY),
-        "from": email_utils.EMAIL_FROM
-    }
-    
-    success = send_2fa_email(email, "123456")
-    
-    if success:
-        return {"status": "success", "message": f"Test code 123456 sent to {email} via Resend API", "config": config_info}
-    else:
-        return {
-            "status": "error", 
-            "message": "Failed to send email via Resend API. Check Render logs for specific API error codes.",
-            "config": config_info
-        }
+# NOTE: /debug/test-email route REMOVED for production security
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
@@ -578,6 +588,7 @@ def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer", "requires_2fa": False}
 
 @app.post("/verify-2fa")
+@limiter.limit("5/minute")
 def verify_2fa(
     data: schemas.TwoFactorVerify, 
     response: Response,
@@ -585,7 +596,7 @@ def verify_2fa(
     db: Session = Depends(get_db)
 ):
     user = db.query(models.User).filter(models.User.email == data.email).first()
-    if not user or user.two_factor_code != data.code:
+    if not user or not user.two_factor_code or not auth.verify_password(data.code, user.two_factor_code):
         raise HTTPException(status_code=400, detail="Invalid 2FA code")
     
     if data.trust_device:
@@ -622,6 +633,10 @@ def verify_2fa(
 
 @app.patch("/users/me/email", response_model=schemas.UserResponse)
 def update_user_email(data: schemas.UserUpdateEmail, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Re-authenticate before allowing email change
+    if not data.current_password or not auth.verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=403, detail="Current password verification required to change email.")
+    
     # Check if new email already exists
     exists = db.query(models.User).filter(models.User.email == data.new_email).first()
     if exists:
@@ -753,7 +768,7 @@ def enable_2fa(data: schemas.Enable2FARequest, db: Session = Depends(get_db), cu
     if not data.code or len(data.code) < 4:
         raise HTTPException(status_code=400, detail="PIN/code must be at least 4 characters long.")
     current_user.is_2fa_enabled = True
-    current_user.two_factor_code = data.code
+    current_user.two_factor_code = auth.get_password_hash(data.code)
     db.commit()
     return {"message": "2FA successfully enabled."}
 
@@ -772,7 +787,7 @@ def edit_2fa(data: schemas.Edit2FARequest, db: Session = Depends(get_db), curren
         raise HTTPException(status_code=403, detail="Authentication failed. Incorrect password.")
     if not data.new_code or len(data.new_code) < 4:
         raise HTTPException(status_code=400, detail="PIN/code must be at least 4 characters long.")
-    current_user.two_factor_code = data.new_code
+    current_user.two_factor_code = auth.get_password_hash(data.new_code)
     db.commit()
     return {"message": "2FA PIN successfully updated."}
 
@@ -787,10 +802,8 @@ def forgot_password(
     """Step 1: Generate a 6-digit OTP and email it to the user."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
     if not user:
-        raise HTTPException(
-            status_code=404, 
-            detail="Studio not found. Please verify your email or create a new account."
-        )
+        # Return success even if user doesn't exist to prevent email enumeration
+        return {"message": "If an account with that email exists, a verification code has been dispatched."}
 
     # Generate a cryptographically-adequate 6-digit OTP
     otp = f"{random.SystemRandom().randint(0, 999999):06d}"
@@ -807,7 +820,8 @@ def forgot_password(
 
 
 @app.post("/verify-otp")
-def verify_otp(data: schemas.VerifyOTP, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def verify_otp(request: Request, data: schemas.VerifyOTP, db: Session = Depends(get_db)):
     """Step 2: Validate the OTP without consuming it (confirms code is correct before asking for new password)."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
 
@@ -826,7 +840,8 @@ def verify_otp(data: schemas.VerifyOTP, db: Session = Depends(get_db)):
 
 
 @app.post("/reset-password-otp")
-def reset_password_otp(data: schemas.ResetPasswordOTP, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def reset_password_otp(request: Request, data: schemas.ResetPasswordOTP, db: Session = Depends(get_db)):
     """Step 3: Validate OTP + set the new password atomically."""
     user = db.query(models.User).filter(models.User.email == data.email).first()
 
@@ -848,9 +863,6 @@ def reset_password_otp(data: schemas.ResetPasswordOTP, db: Session = Depends(get
     db.commit()
     return {"message": "Password has been successfully reset. You may now log in."}
 
-
-    return data
-
 @app.post("/upload/initiate")
 def initiate_upload(data: schemas.MultipartInitiate, current_user: models.User = Depends(get_current_user)):
     """Initiate a multi-stage upload session for large cinematic files."""
@@ -870,17 +882,6 @@ def complete_upload(data: schemas.MultipartComplete, current_user: models.User =
     if not success:
         raise HTTPException(status_code=400, detail="Media assembly failed. Network fragments may be missing.")
     return {"message": "Cinematic master assembled successfully."}
-
-@app.post("/reset-password")
-def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == data.email).first()
-    if not user or user.reset_token != data.token:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    
-    user.hashed_password = auth.get_password_hash(data.new_password)
-    user.reset_token = None
-    db.commit()
-    return {"message": "Password has been successfully reset."}
 
 @app.get("/users/me", response_model=schemas.UserResponse)
 def get_user_me(current_user: models.User = Depends(get_current_user)):
@@ -1181,8 +1182,13 @@ def delete_project(
 ):
     project = _get_project_for_user(project_id, current_user, db)
     
-    # Optional: Delete file from S3 here if you want to save space
-    # s3_utils.delete_file_from_s3(project.media_url) etc.
+    # Clean up S3 assets to prevent orphaned files
+    for url_field in [project.media_url, project.raw_media_url, project.optimized_url, project.thumbnail_url]:
+        if url_field:
+            try:
+                s3_utils.delete_file(url_field)
+            except Exception as e:
+                logger.warning(f"S3 cleanup skip: {e}")
     
     db.delete(project)
     db.commit()
@@ -1234,11 +1240,20 @@ def get_project_comments(
 def update_comment(
     comment_id: int,
     update: schemas.ProjectCommentUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     comment = db.query(models.ProjectComment).filter(models.ProjectComment.id == comment_id).first()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
+    # Verify the comment belongs to a project owned by this user
+    project = comment.project
+    portfolio = db.query(models.Portfolio).filter(
+        models.Portfolio.id == project.portfolio_id,
+        models.Portfolio.user_id == current_user.id
+    ).first()
+    if not portfolio:
+        raise HTTPException(status_code=403, detail="Access denied")
     if update.text is not None:
         comment.text = update.text
     if update.is_resolved is not None:
@@ -1250,11 +1265,20 @@ def update_comment(
 @app.delete("/comments/{comment_id}")
 def delete_comment(
     comment_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
     comment = db.query(models.ProjectComment).filter(models.ProjectComment.id == comment_id).first()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
+    # Verify the comment belongs to a project owned by this user
+    project = comment.project
+    portfolio = db.query(models.Portfolio).filter(
+        models.Portfolio.id == project.portfolio_id,
+        models.Portfolio.user_id == current_user.id
+    ).first()
+    if not portfolio:
+        raise HTTPException(status_code=403, detail="Access denied")
     db.delete(comment)
     db.commit()
     return {"message": "Comment deleted successfully"}

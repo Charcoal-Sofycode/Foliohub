@@ -56,6 +56,30 @@ def upload_file_to_s3(file_obj, original_filename: str):
         print(f"S3 ERROR: Failed to upload {original_filename}. Reason: {e}")
         return None
 
+def delete_file(file_url_or_key: str):
+    """
+    Deletes a file from S3. Accepts either a full S3 URL or a bare object key.
+    """
+    if not file_url_or_key:
+        return
+    try:
+        s3_client = get_s3_client()
+        config = get_config()
+
+        # Extract the object key from a full URL if needed
+        if "amazonaws.com" in file_url_or_key:
+            object_key = file_url_or_key.split(".amazonaws.com/")[-1]
+            # Strip query parameters (presigned URL cleanup)
+            if "?" in object_key:
+                object_key = object_key.split("?")[0]
+        else:
+            object_key = file_url_or_key
+
+        s3_client.delete_object(Bucket=config["bucket"], Key=object_key)
+        print(f"S3: Deleted {object_key}")
+    except Exception as e:
+        print(f"S3 ERROR: Failed to delete {file_url_or_key}. Reason: {e}")
+
 def get_presigned_url(file_url: str, expiration=3600):
     """
     Generates a presigned URL for an object. Accepts either a full S3 URL or a bare S3 key.
