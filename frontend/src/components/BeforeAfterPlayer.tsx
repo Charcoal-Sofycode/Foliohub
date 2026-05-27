@@ -114,11 +114,9 @@ export default forwardRef(function BeforeAfterPlayer({
         const drift = targetRawTime - raw.currentTime;
         if (Math.abs(drift) > 0.15) {
           raw.currentTime = targetRawTime;
-          raw.playbackRate = final.playbackRate;
-        } else if (Math.abs(drift) > 0.01) {
-          const targetRate = final.playbackRate * (1 + drift * 0.5);
-          raw.playbackRate = Math.max(0.5, Math.min(2.0, targetRate));
-        } else {
+        }
+        
+        if (raw.playbackRate !== final.playbackRate) {
           raw.playbackRate = final.playbackRate;
         }
       }
