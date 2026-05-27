@@ -50,7 +50,7 @@ export default function CustomDomainPortfolio({ params }: { params: Promise<{ ho
         </div>
         <h1 className="text-2xl font-bold tracking-tight">Domain Inactive</h1>
         <p className="text-zinc-500 max-w-md">The custom domain mapping for <strong className="text-white">{resolvedParams.hostname}</strong> is currently inactive. The portfolio owner&apos;s premium subscription may have expired.</p>
-        <a href="https://foliohub.media" className="mt-6 px-6 py-3 border border-zinc-800 text-xs uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Visit FolioHub</a>
+        <a href="https://foliohub-swart.vercel.app" className="mt-6 px-6 py-3 border border-zinc-800 text-xs uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Visit FolioHub</a>
       </div>
     );
   }
@@ -60,7 +60,7 @@ export default function CustomDomainPortfolio({ params }: { params: Promise<{ ho
       <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="text-2xl font-bold tracking-tight">Studio Not Found</h1>
         <p className="text-zinc-500 max-w-md">No portfolio is linked to <strong className="text-white">{resolvedParams.hostname}</strong>.</p>
-        <a href="https://foliohub.media" className="mt-6 px-6 py-3 border border-zinc-800 text-xs uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Visit FolioHub</a>
+        <a href="https://foliohub-swart.vercel.app" className="mt-6 px-6 py-3 border border-zinc-800 text-xs uppercase tracking-widest font-bold hover:bg-white hover:text-black transition">Visit FolioHub</a>
       </div>
     );
   }

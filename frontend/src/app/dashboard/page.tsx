@@ -1027,7 +1027,7 @@ function DashboardContent() {
                       required
                     />
                     <span className="mt-2 sm:mt-0 sm:absolute sm:right-0 text-zinc-600 pointer-events-none font-medium text-sm sm:text-base">
-                      .foliohub.media
+                      .foliohub-swart.vercel.app
                     </span>
                   </div>
                 </div>
@@ -1163,19 +1163,19 @@ function DashboardContent() {
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
                       className={`absolute z-[200] bg-zinc-900 border border-zinc-800 rounded-lg p-2 flex flex-col gap-1 shadow-2xl ${sidebarCollapsed ? 'left-full bottom-0 ml-4 w-48' : 'bottom-full left-0 mb-2 w-full'}`}
                     >
-                      <a href="mailto:support@foliohub.media?subject=Help Article Search" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                      <a href="mailto:support@foliohub-swart.vercel.app?subject=Help Article Search" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
                         <Book className="w-4 h-4 shrink-0 text-emerald-400" />
                         <span>Search help articles</span>
                       </a>
-                      <a href="mailto:support@foliohub.media?subject=Bug Report" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                      <a href="mailto:support@foliohub-swart.vercel.app?subject=Bug Report" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
                         <Bug className="w-4 h-4 shrink-0 text-amber-400" />
                         <span>Report a bug</span>
                       </a>
-                      <a href="mailto:support@foliohub.media?subject=Support Request" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                      <a href="mailto:support@foliohub-swart.vercel.app?subject=Support Request" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
                         <LifeBuoy className="w-4 h-4 shrink-0 text-[#6366f1]" />
                         <span>Contact support</span>
                       </a>
-                      <a href="mailto:support@foliohub.media?subject=Feature Request" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
+                      <a href="mailto:support@foliohub-swart.vercel.app?subject=Feature Request" className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition text-xs font-medium">
                         <Lightbulb className="w-4 h-4 shrink-0 text-pink-400" />
                         <span>Request a feature</span>
                       </a>
@@ -1796,7 +1796,7 @@ function DashboardContent() {
                    <form onSubmit={handleUpdatePortfolio} className="space-y-10">
                       <div>
                         <label className="block text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Primary Domain</label>
-                        <input disabled type="text" value={portfolio.subdomain + ".foliohub.media"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
+                        <input disabled type="text" value={portfolio.subdomain + ".foliohub-swart.vercel.app"} className="w-full bg-transparent border-b-2 border-zinc-800 py-3 text-lg text-zinc-500 cursor-not-allowed font-light" />
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-3">
@@ -1840,7 +1840,7 @@ function DashboardContent() {
                               </div>
                               <div className="flex items-center gap-3 text-zinc-400">
                                 <span className="text-[9px] uppercase tracking-widest text-zinc-600 w-12">Value</span>
-                                <span className="text-emerald-400 font-bold">foliohub.media</span>
+                                <span className="text-emerald-400 font-bold">foliohub-swart.vercel.app</span>
                               </div>
                             </div>
                             {portfolio.custom_domain && (

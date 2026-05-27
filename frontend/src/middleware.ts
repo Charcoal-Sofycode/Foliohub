@@ -14,8 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const PLATFORM_HOSTS = [
   'localhost',
   '127.0.0.1',
-  'foliohub.media',
-  'www.foliohub.media',
+  'foliohub-swart.vercel.app',
 ];
 
 export function middleware(request: NextRequest) {
